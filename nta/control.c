@@ -1,0 +1,314 @@
+/*
+ * 	control.c
+ *
+ * 2010 Copyright (c) Ricardo Chen <ricardo.chen@semptianc.om>
+ * All rights reserved.
+ *
+ * 2006 Copyright (c) Evgeniy Polyakov <johnpol@2ka.mipt.ru>
+ * All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+
+#include <sys/poll.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/ioctl.h>
+
+#include <fcntl.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <ctype.h>
+
+#include <netinet/ip.h>
+
+#include <linux/types.h>
+#include <linux/if.h>
+
+#include "control.h"
+
+static struct zc_data zcb[DEFAULT_ZC_NUM];
+
+static int zc_mmap(struct zc_control *ctl, struct zc_status *st)
+{
+	struct zc_data *e;
+	unsigned int entry_num = st->entry_num;
+	int i;
+
+	printf("entry_num = %d\n", entry_num);
+	for (i=0; i<entry_num; ++i) {
+		struct zc_entry_status *ent = &st->entry[i];
+
+		e = &ctl->node_entries[i];
+
+		if (e->data.ptr || !ent->node_num)
+			continue;
+
+		e->data.ptr = mmap(NULL, PAGE_SIZE*(1<<ent->node_order)*ent->node_num, PROT_READ|PROT_WRITE, MAP_SHARED, ctl->fd, i*PAGE_SIZE);
+		if (e->data.ptr == MAP_FAILED) {
+			fprintf(stderr, "Failed to mmap: mmap: %2d.%2d: cpu: %d number: %u, order: %u, offset: %u, errno: %d - %s.\n", 
+					i, st->entry_num, ctl->cpu, ent->node_num, ent->node_order, ctl->offset, errno, strerror(errno));
+			e->data.ptr = NULL;
+			return -1;
+		}
+
+		printf("mmap: %2d.%2d: cpu: %d, ptr: %p, number: %u, order: %u, offset: %u.\n", 
+				i, st->entry_num, ctl->cpu, e->data.ptr, ent->node_num, ent->node_order, ctl->offset);
+		ctl->offset += (1<<ent->node_order)*ent->node_num;
+		e->entry = i;
+
+	}
+
+	return 0;
+}
+
+static int zc_prepare(struct zc_control *ctl)//, unsigned int entry_num)
+{
+	int err;
+	struct zc_status st;
+
+	memset(&st, 0, sizeof(struct zc_status));
+	st.entry_num = 0;
+	err = ioctl(ctl->fd, ZC_STATUS, &st);
+	if (err) {
+		fprintf(stderr, "Failed to get status for CPU%d: %s [%d].\n", 
+				ctl->cpu, strerror(errno), errno);
+		return err;
+	}
+
+	err = zc_mmap(ctl,  &st);
+	if (err)
+		return err;
+	return 0;
+}
+
+int zc_ctl_set_sniff(struct zc_control *zc, int dev_index, int mode)
+{
+	int err;
+	struct zc_sniff zs;
+
+	zs.dev_index = dev_index;
+	zs.sniff_mode = mode;
+
+	err = ioctl(zc->fd, ZC_SET_SNIFF, &zs);
+	if(err) {
+		fprintf(stderr, "Failed to setup sniff mode %d.\n", mode);
+		return err;
+	}
+	return 0;
+}
+
+int zc_ctl_get_devid(struct zc_control *zc, char *dev_name)
+{
+	int err;
+	struct zc_netdev zn;
+
+	strncpy(zn.dev_name, dev_name, 8);
+
+	err = ioctl(zc->fd, ZC_GET_NETDEV, &zn);
+	if(err) {
+		fprintf(stderr, "Failed to get dev %s index.\n", dev_name);
+		return err;
+	}
+	return zn.index;
+}
+
+static char default_ctl_file[] = "/dev/zc";
+
+struct zc_control *zc_ctl_init(int cpu_id, char *ctl_file)
+{
+	int err;
+	struct zc_control  *ctl;
+
+    if(!ctl_file) {
+        ctl_file = default_ctl_file;
+    }
+	ctl = malloc(sizeof(struct zc_control));
+
+	if (!ctl) {
+		fprintf(stderr, "Failed to allocate control structures for CPU %d.\n", cpu_id);
+		return NULL;
+	}
+
+	memset(ctl, 0, sizeof(struct zc_control));
+
+	do {
+		ctl->cpu = cpu_id; 
+		ctl->fd = open(ctl_file, O_RDWR);
+		if (!ctl->fd) {
+			fprintf(stderr, "Failed to open control file %s: %s [%d].\n", ctl_file, strerror(errno), errno);
+			return NULL;
+		}
+
+		err = ioctl(ctl->fd, ZC_SET_CPU, &ctl->cpu);
+		if (err) {
+			close(ctl->fd);
+			fprintf(stderr, "Failed to setup CPU %d.\n", ctl->cpu);
+			return NULL;
+		}
+		if (zc_prepare(ctl)){
+			close(ctl->fd);
+			fprintf(stderr, "Failed to prepare CPU%d.\n", ctl->cpu);
+			return NULL;
+		}
+	}while(0);
+
+	return ctl;
+}
+
+struct pollfd *_pfd;
+int zc_ctl_prepare_polling(struct zc_control **zc_ctl, unsigned int nr_cpus)
+{
+    int i;
+    if(_pfd) {
+        fprintf(stderr, "polling already setupped\n");
+        return -1;
+    }
+	_pfd = malloc(sizeof(struct pollfd) * nr_cpus);
+	if (!_pfd) {
+		fprintf(stderr, "Failed to allocate polling structures for %d cpus.\n", nr_cpus);
+		return -2;
+	}
+	memset(_pfd, 0, sizeof(struct pollfd) * nr_cpus);
+
+	for (i=0; i<nr_cpus; ++i) {
+		_pfd[i].fd = zc_ctl[i]->fd;
+		_pfd[i].events = POLLIN;
+		_pfd[i].revents = 0;
+	}
+	return 0;
+}
+
+int zc_recv_loop(struct zc_control **zc_ctl, 
+				 unsigned int nr_cpus,
+				 char * param,
+				 void (*zc_analyze)(void *ptr, int length, char *param))
+{
+		int poll_ready, i, j;
+		int err;
+		unsigned int num, t_num=0;
+
+		poll_ready = poll(_pfd, nr_cpus, 1000);
+		if (poll_ready == 0){
+			return 0;
+		}
+		if (poll_ready < 0)
+			return -1;
+
+		for (j=0; j<poll_ready; ++j) {
+			if ((!_pfd[j].revents & POLLIN))
+				continue;
+			
+			_pfd[j].events = POLLIN;
+			_pfd[j].revents = 0;
+
+			err = read(zc_ctl[j]->fd, zcb, sizeof(zcb));
+			if (err <= 0) {
+				fprintf(stderr, "Failed to read data from control file: %s [%d].\n", 
+						strerror(errno), errno);
+				return -2;
+			}
+
+			num = err; // /sizeof(struct zc_data);
+			t_num += num;
+			for (i=0; i<num; ++i) {
+				struct zc_data *z;
+				void *ptr;
+				struct zc_data *e;
+
+				z = &zcb[i];
+
+				if (z->entry >= ZC_MAX_ENTRY_NUM || z->cpu >= nr_cpus)
+					continue;
+
+				e = &zc_ctl[z->cpu]->node_entries[z->entry];
+
+#if 1 
+				//printf("dump %4d.%4d: ptr: %p, size: %u, off: %u: entry: %u, cpu: %d\n", 
+				//	i, num, z->data.ptr, z->size, z->off, z->entry, z->cpu);
+#endif
+				ptr = e->data.ptr + z->off;
+				ptr += 66; // (NET_MBUF_PAD_ALLOC+NET_IP_ALIGN);
+				//ptr = e->data.ptr;
+				//zc_analyze_write(out_fd, ptr, z->size);
+				(*zc_analyze)(ptr, z->r_size, param);
+			}
+			err = write(zc_ctl[j]->fd, zcb, num*sizeof(struct zc_data));
+			if (err < 0) {
+				fprintf(stderr, "Failed to write data to control file: %s [%d].\n", 
+						strerror(errno), errno);
+				return -3;
+			} else if (err == 0) {
+				write(zc_ctl[j]->fd, zcb, num*sizeof(struct zc_data));
+			}
+		}
+		return t_num;
+}
+
+void * zc_alloc_buffer(struct zc_control *ctl,
+                       struct zc_alloc_ctl *alloc_ctl)
+{
+    struct zc_data *z, *e;
+    int err;
+    void *ptr;
+    
+    err = ioctl(ctl->fd, ZC_ALLOC, alloc_ctl);
+    if (err) {
+        fprintf(stderr, "Failed to alloc from kernel: %s [%d].\n", strerror(errno), errno);
+        return NULL;
+    }
+    z = &alloc_ctl->zc;
+    //printf("cpu: %d, ptr: %p, size: %u [%u], reserve: %u, off: %u: entry: %u.\n", 
+    //	z->cpu, z->data.ptr, z->size, size, res_len, z->off, z->entry);
+    if (z->entry >= ZC_MAX_ENTRY_NUM){
+        //|| z->cpu >= nr_cpus) {
+        fprintf(stderr, "Wrong entry, exiting.\n");
+        return NULL;
+    }
+    /*if (zc_prepare(ctl, z->entry))
+        break;
+    */
+    e = &ctl->node_entries[z->entry];
+    ptr = e->data.ptr + z->off;
+    //printf("alloc: e->data.ptr %p z->data.ptr %p z->off %d\n", 
+    //	   e->data.ptr, z->data.ptr, z->off);
+    return ptr;
+}
+
+int zc_commit_buffer(struct zc_control *ctl, struct zc_alloc_ctl *alloc_ctl)
+{
+    int err;
+	
+    err = ioctl(ctl->fd, ZC_COMMIT, alloc_ctl);
+    if (err) {
+        fprintf(stderr, "Failed to commit buffer: %s [%d].\n", strerror(errno), errno);
+        return err;
+    }
+    return 0;
+}
+
+void zc_ctl_shutdown(struct zc_control *zc)
+{
+    close(zc->fd);
+    if(_pfd){
+        free(_pfd);
+        _pfd = NULL;
+    }
+}
+

@@ -1,0 +1,14 @@
+NTZC (Network Tree Zero Copy) Version 0.6
+
+Something about Network Tree Zero Copy
+
+Network Tree Zero Copy (ntzc) is a set of tools to support copyless user space (receive and tranmit) network packet access, which includes a kernel module, network buffer kernel library and user mode routines.
+
+NTZC doesn't depend on specific NIC drivers, normal standard NIC drivers can be easily modified using ntzc network buffer APIs to replace sk_buff APIs, which makes user mode applications to access the NIC with zero copy requirement in all the path from NIC DMA to user space ability.
+
+A pcnet32 driver being included to demonstrate how easy to modify the code.
+
+NTZC is inspired by Evgeniy Polyakov's nta and forked from the code, but with extensive simplify, enhancement, debug and test.  
+
+
+
