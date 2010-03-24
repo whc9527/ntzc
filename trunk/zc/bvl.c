@@ -155,10 +155,10 @@ void avl_fill_zc(struct zc_data *zc, void *ptr, unsigned int size, int r_size)
  * @node - node where given pointer @ptr lives
  * @num - number of @BVL_MIN_SIZE chunks given pointer @ptr embeds
  */
-static void avl_update_zc(struct avl_node *node, void *ptr, int size, int r_size)
+static void avl_update_zc(struct avl_node *node, void *ptr, int size, int r_size, int i)
 {
-	struct zc_control *ctl = &zc_sniffer;
-	int cpu = avl_get_cpu_ptr((unsigned long)ptr);
+	struct zc_control *ctl = &zc_sniffer[i];
+	//int cpu = avl_get_cpu_ptr((unsigned long)ptr);
 	unsigned long flags;
 
 	spin_lock_irqsave(&ctl->zc_lock, flags);
@@ -170,7 +170,7 @@ static void avl_update_zc(struct avl_node *node, void *ptr, int size, int r_size
 			ctl->zc_pos = 0;
 
 		atomic_inc(&ch->refcnt);
-		count_update[cpu]++;
+		count_update[i]++;
 		__avl_fill_zc(zc, ptr, size, node, r_size);
 
 		ctl->zc_used++;
@@ -179,7 +179,7 @@ static void avl_update_zc(struct avl_node *node, void *ptr, int size, int r_size
 		ulog("%s: used: %u, pos: %u, num: %u, ptr: %p, size: %u, off: %u.\n",
 				__func__, ctl->zc_used, ctl->zc_pos, ctl->zc_num, ptr, zc->size, zc->off);
 	}else
-		count_miss[cpu]++;
+		count_miss[i]++;
 
 	spin_unlock_irqrestore(&ctl->zc_lock, flags);
 }
@@ -235,6 +235,7 @@ void avl_free_no_zc(void *ptr, unsigned int size)
 void avl_free(void *ptr, int sniff, int size, int r_size)
 {
 	struct avl_chunk *ch = avl_ptr_to_chunk(ptr, size);
+	int i;
 
 	if (unlikely((ch->canary != BVL_CANARY) || ch->size != size)) {
 		printk("Freeing destroyed object: ptr: %p, ch: %p size: %u, canary: %x, must be %x, refcnt: %d, saved size: %u.\n",
@@ -243,8 +244,10 @@ void avl_free(void *ptr, int sniff, int size, int r_size)
         return;
 	}
 
-	if(sniff)
-		avl_update_zc(avl_get_node_ptr((unsigned long)ptr), ptr, size, r_size);
+	for(i=0; i< ZC_MAX_SNIFFERS; i++){
+		if(sniff & (i<<1)) 
+			avl_update_zc(avl_get_node_ptr((unsigned long)ptr), ptr, size, r_size, i);
+	}
 	
 	avl_free_no_zc(ptr, size);
 }

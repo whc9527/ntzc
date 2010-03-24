@@ -191,8 +191,11 @@ struct m_buf *nta_alloc_mbuf(struct net_device *dev,
 
 static void mbuf_release_data(struct m_buf *mbuf)
 {
-	struct zc_control *ctl = &zc_sniffer;
+	struct zc_control *ctl;
+	struct zc_sniff	*sniffer;
 	int sniff=0;
+	u_int16_t p;
+	int i;
 	
 	if (mbuf_shinfo(mbuf)->nr_frags) {
 		int i;
@@ -205,10 +208,47 @@ static void mbuf_release_data(struct m_buf *mbuf)
 		   mbuf->truesize-sizeof(struct m_buf)+sizeof(struct mbuf_shared_info), 
 		   mbuf->end - mbuf->head + sizeof(struct mbuf_shared_info));
 #endif
-	/* more sniffering conditions can be here */
-	if((mbuf->dir & ctl->sniff_mode[mbuf->nta_index]))
-		sniff = 1;	
-
+	for(i=0; i< ZC_MAX_SNIFFERS; i++){
+		ctl = &zc_sniffer[i];
+		if(!ctl->bind) {
+			continue;
+		}
+		/* more sniffering conditions can be here */
+		sniffer = &ctl->sniffer[mbuf->nta_index];
+		if((mbuf->dir & sniffer->dev_index)){
+			p = sniffer->pre_p;
+			if(!p) {
+				sniff &= (1<<i);
+			}else{
+				if(p == mbuf->protocol) {
+					if(p == ZC_PRE_P_NPCP) {
+						switch (sniffer->pre_type) {
+						case ZC_PRE_P_ALL:
+							sniff |= (1<<i);
+							break;
+						case ZC_PRE_P_CONRTOL:
+							if( (mbuf->data[3] & 0xf0) == ZC_PRE_P_CONRTOL)
+								sniff |= (1<<i);
+							break;
+						case ZC_PRE_P_PACKET:
+							if((mbuf->data[3] == ZC_PRE_P_PACKET) && (mbuf->data[4]&0xf0)==1) {
+								sniff |= (1<<i);
+							}
+							break;
+						case ZC_PRE_P_SESSION:
+							if((mbuf->data[3] == ZC_PRE_P_PACKET) && (mbuf->data[4]&0xf0)!=1) {
+								sniff |= (1<<i);
+							}
+						default:
+							sniff |= (0<<i);
+						}
+					}else
+						sniff |= (1<<i);
+				}
+			}
+		}
+	}
+	
 	avl_free(mbuf->head, sniff, mbuf->truesize-sizeof(struct m_buf)+ sizeof(struct mbuf_shared_info), mbuf->len);
 }
 
@@ -297,7 +337,7 @@ int nta_register_zc(struct net_device *netdev,
 							    struct net_device *dev))
 {
 	int i;
-	struct zc_control *zc = &zc_sniffer;
+	struct zc_control *zc = &zc_sniffer[0];
 	for(i=0; i< ZC_MAX_NETDEVS; i++) {
 		//printk("zc->netdev[%d] %p\n", i, zc->netdev[i]);
 		if(!zc->netdev[i]){
@@ -345,7 +385,7 @@ static void nta_test_func(unsigned long data)
 
 static int nta_counter_show(struct seq_file *seq, void *v)
 {
-	struct zc_control *ctl = &zc_sniffer;
+	struct zc_control *ctl = &zc_sniffer[0];
 
 	seq_printf(seq, "Network Tree Zero Copy statistics:\n");
 	seq_printf(seq, "\tcounter[0]: alloc %lu free %lu hook %lu unhook %lu update %lu miss %lu cache %lu full %lu\n", 

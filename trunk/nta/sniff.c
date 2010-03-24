@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
 	/* no recv packet by the loop*/
 	while (!terminated) {
 		int i;
-		i = zc_recv_loop(zc_ctl, nr_cpus, zc_analyze, NULL);
+		i = zc_recv_loop(zc_ctl, nr_cpus, NULL, zc_analyze);
 		if(i<0) {
 			printf("Error in the zc recv loop %d\n", i);
 			break;
