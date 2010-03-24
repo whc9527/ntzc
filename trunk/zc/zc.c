@@ -38,6 +38,7 @@
 #include <linux/ip.h>
 #include <linux/netdevice.h>
 #include <asm/uaccess.h>
+#include <linux/miscdevice.h>
 
 #include "bvl.h"
 #include "nta.h"
@@ -598,19 +599,26 @@ static struct file_operations zc_ops = {
 	.owner 		= THIS_MODULE,
 };
 
+static struct miscdevice zc_gen_dev =
+{
+	.minor		= 0,
+	.name		= "zc",
+	.fops		= &zc_ops,
+};
+
 int avl_init_zc(void)
 {
 	struct zc_control *ctl; //= &zc_sniffer;
 	int i;
 
-	zc_major = register_chrdev(0, zc_name, &zc_ops);
-	if (zc_major < 0) {
-		printk(KERN_ERR "Failed to register %s char device: err=%d. Zero-copy is disabled.\n",
-				zc_name, zc_major);
+	//zc_major = register_chrdev(0, zc_name, &zc_ops);
+	if (misc_register(&zc_gen_dev) < 0) {
+		printk(KERN_ERR "Failed to register %s char device. Zero-copy is disabled.\n",
+				zc_gen_dev.name);
 		return -EINVAL;
 	}
 
-	printk(KERN_INFO "Network zero-copy sniffer has been enabled with %d major number.\n", zc_major);
+	printk(KERN_INFO "Network zero-copy sniffer has been enabled\n");
 
 	for(i=0; i<ZC_MAX_SNIFFERS; i++) {
 		ctl = &zc_sniffer[i];
@@ -629,5 +637,5 @@ int avl_init_zc(void)
 
 void avl_deinit_zc(void)
 {
-	unregister_chrdev(zc_major, zc_name);
+	misc_deregister(&zc_gen_dev);
 }

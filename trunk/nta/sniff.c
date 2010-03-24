@@ -46,7 +46,6 @@
 
 #include "control.h"
 
-#define NR_CPUS			2
 struct zc_control *zc_ctl[NR_CPUS];
 
 unsigned long g_count, g_num_read, g_num_write;
@@ -77,6 +76,7 @@ static void zc_usage(char *p)
 	((unsigned char *)&addr)[1], \
 	((unsigned char *)&addr)[2], \
 	((unsigned char *)&addr)[3]
+
 
 static void zc_analyze(void *ptr, int length, char *nouse)
 {
