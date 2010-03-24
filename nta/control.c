@@ -43,7 +43,7 @@
 
 #include "control.h"
 
-static struct zc_data zcb[DEFAULT_ZC_NUM];
+static struct zc_data zcb[NR_CPUS][DEFAULT_ZC_NUM];
 
 static int zc_mmap(struct zc_control *ctl, struct zc_status *st)
 {
@@ -112,6 +112,16 @@ int zc_ctl_set_sniff(struct zc_control *zc, int dev_index, int mode)
 		return err;
 	}
 	return 0;
+}
+
+int zc_ctl_enable_sniff(struct zc_control *zc, int enable)
+{
+	int err;
+
+	err = ioctl(zc->fd, ZC_ENABLE_SNIFF, &enable);
+
+	return err;
+
 }
 
 int zc_ctl_get_devid(struct zc_control *zc, char *dev_name)
@@ -232,7 +242,7 @@ int zc_recv_loop(struct zc_control **zc_ctl,
 				void *ptr;
 				struct zc_data *e;
 
-				z = &zcb[i];
+				z = &zcb[z->cpu][i];
 
 				if (z->entry >= ZC_MAX_ENTRY_NUM || z->cpu >= nr_cpus)
 					continue;
@@ -259,6 +269,85 @@ int zc_recv_loop(struct zc_control **zc_ctl,
 			}
 		}
 		return t_num;
+}
+
+int zc_save_into_pool(struct zc_control **zc_ctl, 
+				 unsigned int nr_cpus,
+				 struct zc_pool *pool)
+{
+	int poll_ready, i, j;
+	int err;
+	unsigned int num, t_num=0;
+
+	poll_ready = poll(_pfd, nr_cpus, 1000);
+	if (poll_ready == 0){
+		return 0;
+	}
+	if (poll_ready < 0)
+		return -1;
+
+	for (j=0; j<poll_ready; ++j) {
+		if ((!_pfd[j].revents & POLLIN))
+			continue;
+			
+		_pfd[j].events = POLLIN;
+		_pfd[j].revents = 0;
+
+		err = read(zc_ctl[j]->fd, zcb[j], sizeof(zcb[0]));
+		if (err <= 0) {
+			fprintf(stderr, "Failed to read data from control file: %s [%d].\n", 
+					strerror(errno), errno);
+			return -2;
+		}
+
+		num = err; // /sizeof(struct zc_data);
+		t_num += num;
+		for (i=0; i<num; ++i) {
+			struct zc_data *z;
+			void *ptr;
+			struct zc_data *e;
+
+			z = &zcb[z->cpu][i];
+
+			if (z->entry >= ZC_MAX_ENTRY_NUM || z->cpu >= nr_cpus)
+				continue;
+
+			e = &zc_ctl[z->cpu]->node_entries[z->entry];
+
+#if 1 
+				//printf("dump %4d.%4d: ptr: %p, size: %u, off: %u: entry: %u, cpu: %d\n", 
+				//	i, num, z->data.ptr, z->size, z->off, z->entry, z->cpu);
+#endif
+			ptr = e->data.ptr + z->off;
+			ptr += 66; // (NET_MBUF_PAD_ALLOC+NET_IP_ALIGN);
+			//ptr = e->data.ptr;
+			//zc_analyze_write(out_fd, ptr, z->size);
+			pool->_pool[i] = ptr;
+			pool->_len[i] = z->r_size;
+		}
+		pool->num[j] = num;
+	}
+	return 0;
+}
+
+int zc_release_pool(struct zc_control **zc_ctl, 
+				 unsigned int nr_cpus,
+				 struct zc_pool *pool)
+{
+	int err;
+	int i;
+
+	for(i=0; i<NR_CPUS; i++) {
+		err = write(zc_ctl[i]->fd, zcb[i], pool->num[i]*sizeof(struct zc_data));
+		if (err < 0) {
+			fprintf(stderr, "Failed to write data to control file: %s [%d].\n", 
+					strerror(errno), errno);
+			continue;
+		} else if (err == 0) {
+			write(zc_ctl[i]->fd, zcb[i], pool->num[i]*sizeof(struct zc_data));
+		}
+	}
+	return 0;
 }
 
 void * zc_alloc_buffer(struct zc_control *ctl,

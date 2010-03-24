@@ -86,12 +86,24 @@ struct zc_netdev
 
 struct zc_sniff
 {
+	int sniff_id;
 	int dev_index;
 	int sniff_mode;
 #define ZC_SNIFF_NONE		0
 #define ZC_SNIFF_RX			1
 #define ZC_SNIFF_TX			2
 #define ZC_SNIFF_ALL		3
+	u_int16_t	pre_p;		
+#define ZC_PRE_P_NPCP		0x8050
+#define ZC_PRE_P_NORMAL		0
+	u_int16_t	pre_type;
+#define ZC_PRE_P_ALL		0
+#define ZC_PRE_P_CONRTOL	0x20
+#define ZC_PRE_P_PACKET		0x10
+#define ZC_PRE_P_SESSION	0x11
+
+	u_int32_t acl_index;
+	
 };
 
 #define ZC_ALLOC			_IOWR('Z', 1, struct zc_alloc_ctl)
@@ -100,6 +112,11 @@ struct zc_sniff
 #define ZC_STATUS			_IOWR('Z', 4, struct zc_status)
 #define ZC_SET_SNIFF		_IOWR('Z', 5, struct zc_sniff)
 #define ZC_GET_NETDEV		_IOWR('Z', 6, struct zc_netdev)
+#define ZC_ENABLE_SNIFF		_IOR('Z', 7, int)
+#define ZC_DISABLE_SNIFF	_IOR('Z', 8, int)
+
+
+#define NR_CPUS			2
 
 
 struct zc_control *zc_ctl_init(int nr_cpus, char *ctl_file);
@@ -116,5 +133,20 @@ int zc_commit_buffer(struct zc_control *ctl, struct zc_alloc_ctl *alloc_ctl);
 
 int zc_ctl_set_sniff(struct zc_control *zc, int dev_index, int mode);
 int zc_ctl_get_devid(struct zc_control *zc, char *dev_name);
+
+struct zc_pool{
+	char *_pool[DEFAULT_ZC_NUM];
+	unsigned int _len[DEFAULT_ZC_NUM];
+	int num[NR_CPUS];
+};
+
+int zc_save_into_pool(struct zc_control **zc_ctl, 
+				 unsigned int nr_cpus,
+				 struct zc_pool *pool);
+
+int zc_release_pool(struct zc_control **zc_ctl, 
+				 unsigned int nr_cpus,
+				 struct zc_pool *pool);
+
 
 #endif /* __INT_H */
