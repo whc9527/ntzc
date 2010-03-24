@@ -47,11 +47,13 @@ struct zc_private
 	struct zc_data	*zcb;
 	struct mutex	lock;
 	int		cpu;
+	int		sniff_id;
 };
 
 static char zc_name[] = "zc";
 static int zc_major;
-struct zc_control zc_sniffer;
+struct zc_control zc_sniffer[ZC_MAX_SNIFFERS];
+int zc_users;
 
 static int zc_release(struct inode *inode, struct file *file)
 {
@@ -64,13 +66,14 @@ static int zc_release(struct inode *inode, struct file *file)
 static int zc_open(struct inode *inode, struct file *file)
 {
 	struct zc_private *priv;
-	struct zc_control *ctl = &zc_sniffer;
+	struct zc_control *ctl = &zc_sniffer[0];
 
 	priv = kzalloc(sizeof(struct zc_private) + ctl->zc_num * sizeof(struct zc_data), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 	priv->zcb = (struct zc_data *)(priv+1);
 	priv->cpu = 0; /* Use CPU0 by default */
+	priv->sniff_id = 0; /* Default sniffer id */
 	mutex_init(&priv->lock);
 
 	file->private_data = priv;
@@ -159,7 +162,7 @@ static ssize_t zc_write(struct file *file, const char __user *buf, size_t size, 
 	struct zc_private *priv = file->private_data;
 	unsigned long flags;
 	unsigned int req_num = size/sizeof(struct zc_data), cnum, csize, i;
-	struct zc_control *ctl = &zc_sniffer;
+	struct zc_control *ctl = &zc_sniffer[priv->sniff_id];
 
 	while (size) {
 		cnum = min_t(unsigned int, req_num, ctl->zc_num);
@@ -191,7 +194,7 @@ static ssize_t zc_read(struct file *file, char __user *buf, size_t size, loff_t 
 	struct zc_private *priv = file->private_data;
 	unsigned long flags;
 	unsigned int req_num = size/sizeof(struct zc_data), cnum, csize;
-	struct zc_control *ctl = &zc_sniffer;
+	struct zc_control *ctl = &zc_sniffer[priv->sniff_id];
 
 	if(req_num != DEFAULT_ZC_NUM) {
 		return -EINVAL;
@@ -233,7 +236,8 @@ static ssize_t zc_read(struct file *file, char __user *buf, size_t size, loff_t 
 
 static unsigned int zc_poll(struct file *file, struct poll_table_struct *wait)
 {
-	struct zc_control *ctl = &zc_sniffer;
+	struct zc_private *priv = file->private_data;
+	struct zc_control *ctl = &zc_sniffer[priv->sniff_id];
 	unsigned int poll_flags = 0;
 
 	poll_wait(file, &ctl->zc_wait, wait);
@@ -295,6 +299,8 @@ static int zc_ctl_commit(struct zc_alloc_ctl *ctl)
 	int		(*hard_start_xmit) (struct m_buf *mbuf,
 							struct net_device *dev);
 
+	struct zc_control *zc = &zc_sniffer[0];
+
 	//printk("%s: ptr: %p, size: %u, reserved: %u, type: %x.\n",
 	//		__func__, ctl->zc.data.ptr, ctl->zc.size, ctl->res_len, ctl->type);
 
@@ -305,9 +311,9 @@ static int zc_ctl_commit(struct zc_alloc_ctl *ctl)
 	data = ctl->zc.data.ptr;
 	data_len = ctl->zc.r_size;
 
-	dev = zc_sniffer.netdev[ctl->zc.netdev_index];
+	dev = zc->netdev[ctl->zc.netdev_index];
 	if(dev)
-		hard_start_xmit = zc_sniffer.hard_start_xmit;
+		hard_start_xmit = zc->hard_start_xmit;
 	else
 		hard_start_xmit = NULL;
 #if 0
@@ -426,7 +432,7 @@ static int zc_get_netdev(char *dev_name)
 {
 
 	int i;
-	struct zc_control *zc = &zc_sniffer;
+	struct zc_control *zc = &zc_sniffer[0];
 
 	for(i=0; i<ZC_MAX_NETDEVS; i++) {
 		if(zc->netdev[i]) {
@@ -474,26 +480,57 @@ static int zc_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 				ret = 0;
 			}
 			break;
+		case ZC_ENABLE_SNIFF:
+			if (copy_from_user(&cpu, (void __user *)arg, sizeof(int))) {
+				ret = -EFAULT;
+				break;
+			}
+			if (cpu < ZC_MAX_SNIFFERS && cpu >= 0) {
+				priv->sniff_id = cpu;
+				zc_sniffer[cpu].bind = 1;
+				ret = 0;
+			}
+			break;
+		case ZC_DISABLE_SNIFF:
+			if (copy_from_user(&cpu, (void __user *)arg, sizeof(int))) {
+				ret = -EFAULT;
+				break;
+			}
+			if (cpu < ZC_MAX_SNIFFERS && cpu >= 0) {
+				priv->sniff_id = 0;
+				zc_sniffer[cpu].bind = 0;
+				ret = 0;
+			}
+			break;
+
 		case ZC_SET_SNIFF:
 			{
 				struct zc_sniff sniff;
-				struct zc_control *zc = &zc_sniffer;
-				int i;
+				struct zc_control *zc;
+				int i, j;
 				if (copy_from_user(&sniff, (void __user *)arg, sizeof(sniff))) {
 					ret = -EFAULT;
 					break;
 				}
+
 				i = sniff.dev_index;
-				if(i<0 || i> ZC_MAX_NETDEVS 
-					|| sniff.sniff_mode > ZC_SNIFF_ALL
-				    || sniff.sniff_mode < 0
-				    || !zc->netdev[i]){
+				j = sniff.sniff_id;
+
+				if(j< 0 || j> ZC_MAX_SNIFFERS) {
 					ret = -EINVAL;
 					break;
 				}
-				spin_lock_irqsave(&zc_sniffer.zc_lock, flags);
-				zc->sniff_mode[i] = sniff.sniff_mode;
-				spin_unlock_irqrestore(&zc_sniffer.zc_lock, flags);
+				zc = &zc_sniffer[j];
+				if(i<0 || i> ZC_MAX_NETDEVS 
+					|| sniff.sniff_mode > ZC_SNIFF_ALL
+					|| sniff.sniff_mode < 0
+					|| !zc->netdev[i]){
+					ret = -EINVAL;
+					break;
+				}
+				spin_lock_irqsave(&zc->zc_lock, flags);
+				memcpy(&zc->sniffer[i], &sniff, sizeof(sniff));
+				spin_unlock_irqrestore(&zc->zc_lock, flags);
 				ret = 0;
 				break;
 			}
@@ -563,15 +600,8 @@ static struct file_operations zc_ops = {
 
 int avl_init_zc(void)
 {
-	struct zc_control *ctl = &zc_sniffer;
-
-	memset(ctl, 0, sizeof(*ctl));
-	ctl->zc_num = DEFAULT_ZC_NUM;
-	init_waitqueue_head(&ctl->zc_wait);
-	spin_lock_init(&ctl->zc_lock);
-	ctl->zcb = kmalloc(ctl->zc_num * sizeof(struct zc_data), GFP_KERNEL);
-	if (!ctl->zcb)
-		return -ENOMEM;
+	struct zc_control *ctl; //= &zc_sniffer;
+	int i;
 
 	zc_major = register_chrdev(0, zc_name, &zc_ops);
 	if (zc_major < 0) {
@@ -581,6 +611,18 @@ int avl_init_zc(void)
 	}
 
 	printk(KERN_INFO "Network zero-copy sniffer has been enabled with %d major number.\n", zc_major);
+
+	for(i=0; i<ZC_MAX_SNIFFERS; i++) {
+		ctl = &zc_sniffer[i];
+		memset(ctl, 0, sizeof(*ctl));
+		ctl->zc_num = DEFAULT_ZC_NUM;
+		init_waitqueue_head(&ctl->zc_wait);
+		spin_lock_init(&ctl->zc_lock);
+		ctl->zcb = kmalloc(ctl->zc_num * sizeof(struct zc_data), GFP_KERNEL);
+		if (!ctl->zcb)
+			return -ENOMEM;
+	}
+
 
 	return 0;
 }

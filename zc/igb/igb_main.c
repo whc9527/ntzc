@@ -5242,8 +5242,18 @@ static void igb_receive_mbuf(struct igb_q_vector *q_vector,
 {
 	struct igb_adapter *adapter = q_vector->adapter;
 
+	struct ether_header
+	{
+	  u_int8_t  ether_dhost[ETH_ALEN];	/* destination eth addr	*/
+	  u_int8_t  ether_shost[ETH_ALEN];	/* source ether addr	*/
+	  u_int16_t ether_type;		        /* packet type ID field	*/
+	} __attribute__ ((__packed__));
+
+	struct ether_header *eth = (struct ether_header*)mbuf->data;
+
 	mbuf->dir = NTA_DIR_RX;
 	mbuf->nta_index = adapter->nta_index;
+	mbuf->protocol = ntohs(eth->ether_type);
 	//printk("recv buf %p mbuf->data, len %d\n", mbuf->data, mbuf->len);
 	nta_kfree_mbuf(mbuf);
 }
