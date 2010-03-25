@@ -43,6 +43,20 @@
 
 #include "control.h"
 
+#define dump_skb(s, p, l) \
+do {\
+    int i;\
+    printf("\n%s %s packet: \n", __FUNCTION__, s);\
+    for(i=0; i<l; i++) {\
+		printf("%02x ", p[i]&0xff); \
+        if((i+1)%8==0) {\
+            printf( "\n");\
+        }\
+    } \
+    printf( "\n"); \
+}while(0)
+
+
 static struct zc_data zcb[NR_CPUS][DEFAULT_ZC_NUM];
 
 static int zc_mmap(struct zc_control *ctl, struct zc_status *st)
@@ -98,27 +112,24 @@ static int zc_prepare(struct zc_control *ctl)//, unsigned int entry_num)
 	return 0;
 }
 
-int zc_ctl_set_sniff(struct zc_control *zc, int dev_index, int mode)
+int zc_ctl_set_sniff(struct zc_control *zc, struct zc_sniff *zs)
 {
 	int err;
-	struct zc_sniff zs;
 
-	zs.dev_index = dev_index;
-	zs.sniff_mode = mode;
-
-	err = ioctl(zc->fd, ZC_SET_SNIFF, &zs);
+	err = ioctl(zc->fd, ZC_SET_SNIFF, zs);
 	if(err) {
-		fprintf(stderr, "Failed to setup sniff mode %d.\n", mode);
+		fprintf(stderr, "Failed to setup sniff mode.\n");
 		return err;
 	}
 	return 0;
 }
 
-int zc_ctl_enable_sniff(struct zc_control *zc, int enable)
+int zc_ctl_enable_sniff(struct zc_control *zc, int enable, int id)
 {
 	int err;
+	int command = enable? ZC_ENABLE_SNIFF: ZC_DISABLE_SNIFF;
 
-	err = ioctl(zc->fd, ZC_ENABLE_SNIFF, &enable);
+	err = ioctl(zc->fd, command, &id);
 
 	return err;
 
@@ -228,7 +239,7 @@ int zc_recv_loop(struct zc_control **zc_ctl,
 			_pfd[j].events = POLLIN;
 			_pfd[j].revents = 0;
 
-			err = read(zc_ctl[j]->fd, zcb, sizeof(zcb));
+			err = read(zc_ctl[j]->fd, zcb[j], sizeof(zcb[j]));
 			if (err <= 0) {
 				fprintf(stderr, "Failed to read data from control file: %s [%d].\n", 
 						strerror(errno), errno);
@@ -239,27 +250,31 @@ int zc_recv_loop(struct zc_control **zc_ctl,
 			t_num += num;
 			for (i=0; i<num; ++i) {
 				struct zc_data *z;
-				void *ptr;
+				char *ptr;
 				struct zc_data *e;
 
-				z = &zcb[z->cpu][i];
+				z = &zcb[j][i];
 
-				if (z->entry >= ZC_MAX_ENTRY_NUM || z->cpu >= nr_cpus)
+				if (z->entry >= ZC_MAX_ENTRY_NUM )// || z->cpu >= nr_cpus)
 					continue;
 
 				e = &zc_ctl[z->cpu]->node_entries[z->entry];
 
-#if 1 
-				//printf("dump %4d.%4d: ptr: %p, size: %u, off: %u: entry: %u, cpu: %d\n", 
-				//	i, num, z->data.ptr, z->size, z->off, z->entry, z->cpu);
+#if 0 
+				printf("dump %4d.%4d: ptr: %p, size: %u, off: %u: entry: %u, cpu: %d\n", 
+					i, num, z->data.ptr, z->r_size, z->off, z->entry, z->cpu);
 #endif
 				ptr = e->data.ptr + z->off;
+
+				//dump_skb("1", ptr, 64);
 				ptr += 66; // (NET_MBUF_PAD_ALLOC+NET_IP_ALIGN);
+				//dump_skb("2", ptr, 64);
+
 				//ptr = e->data.ptr;
 				//zc_analyze_write(out_fd, ptr, z->size);
 				(*zc_analyze)(ptr, z->r_size, param);
 			}
-			err = write(zc_ctl[j]->fd, zcb, num*sizeof(struct zc_data));
+			err = write(zc_ctl[j]->fd, zcb[j], num*sizeof(struct zc_data));
 			if (err < 0) {
 				fprintf(stderr, "Failed to write data to control file: %s [%d].\n", 
 						strerror(errno), errno);

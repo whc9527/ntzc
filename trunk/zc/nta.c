@@ -215,10 +215,17 @@ static void mbuf_release_data(struct m_buf *mbuf)
 		}
 		/* more sniffering conditions can be here */
 		sniffer = &ctl->sniffer[mbuf->nta_index];
-		if((mbuf->dir & sniffer->dev_index)){
+		if(0 && mbuf->dir) {
+			printk("sniffer = dev_index %d, pre_p 0x%x pre_type 0x%x sniffer id: %d mode: %d\n", 
+				   sniffer->dev_index, sniffer->pre_p, sniffer->pre_type, sniffer->sniff_id, sniffer->sniff_mode);
+			printk("mbuf->dir = %d, mbuf->protocol = 0x%x, mbuf->data [0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x]\n",
+				   mbuf->dir, mbuf->protocol, mbuf->data[0], mbuf->data[1], mbuf->data[2], mbuf->data[3],
+				   mbuf->data[4], mbuf->data[5], mbuf->data[6], mbuf->data[7]); 
+		}
+		if((mbuf->dir & sniffer->sniff_mode)){
 			p = sniffer->pre_p;
 			if(!p) {
-				sniff &= (1<<i);
+				sniff |= (1<<i);
 			}else{
 				if(p == mbuf->protocol) {
 					if(p == ZC_PRE_P_NPCP) {
@@ -247,6 +254,7 @@ static void mbuf_release_data(struct m_buf *mbuf)
 				}
 			}
 		}
+		//printk("sniffer %i result 0x%x\n", i, sniff);
 	}
 	
 	avl_free(mbuf->head, sniff, mbuf->truesize-sizeof(struct m_buf)+ sizeof(struct mbuf_shared_info), mbuf->len);
