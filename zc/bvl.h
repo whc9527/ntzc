@@ -244,7 +244,7 @@ void avl_deinit_zc(void);
 void avl_fill_zc(struct zc_data *zc, void *ptr, unsigned int size, int r_size);
 
 #define ZC_MAX_NETDEVS		8
-#define ZC_MAX_SNIFFERS		8
+#define ZC_MAX_SNIFFERS		3
 
 struct zc_control
 {

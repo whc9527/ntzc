@@ -198,6 +198,8 @@ static ssize_t zc_read(struct file *file, char __user *buf, size_t size, loff_t 
 	struct zc_control *ctl = &zc_sniffer[priv->sniff_id];
 
 	if(req_num != DEFAULT_ZC_NUM) {
+		printk("sizeof zc_data %d, req_num %d size = %d\n",
+			   sizeof(struct zc_data), req_num, size);
 		return -EINVAL;
 	}
 	wait_event_interruptible(ctl->zc_wait, ctl->zc_used > 0);

@@ -135,6 +135,10 @@ static void __avl_fill_zc(struct zc_data *zc, void *ptr, unsigned int size, stru
 	zc->r_size = r_size;
 	zc->entry = node->entry->avl_entry_num;
 	zc->cpu = avl_get_cpu_ptr((unsigned long)ptr);
+
+	//printk("%s: ptr: %p, size: %u, off: %u, cpu %d, entry %d\n",
+	//		__func__, ptr, size, zc->off,  zc->cpu, zc->entry);
+
 }
 
 void avl_fill_zc(struct zc_data *zc, void *ptr, unsigned int size, int r_size)
@@ -245,8 +249,9 @@ void avl_free(void *ptr, int sniff, int size, int r_size)
 	}
 
 	for(i=0; i< ZC_MAX_SNIFFERS; i++){
-		if(sniff & (i<<1)) 
+		if(sniff & (1<<i)) {
 			avl_update_zc(avl_get_node_ptr((unsigned long)ptr), ptr, size, r_size, i);
+		}
 	}
 	
 	avl_free_no_zc(ptr, size);

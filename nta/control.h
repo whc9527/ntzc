@@ -131,7 +131,7 @@ void * zc_alloc_buffer(struct zc_control *ctl,
                        struct zc_alloc_ctl *alloc_ctl);
 int zc_commit_buffer(struct zc_control *ctl, struct zc_alloc_ctl *alloc_ctl);
 
-int zc_ctl_set_sniff(struct zc_control *zc, int dev_index, int mode);
+int zc_ctl_set_sniff(struct zc_control *zc, struct zc_sniff *zs);
 int zc_ctl_get_devid(struct zc_control *zc, char *dev_name);
 
 struct zc_pool{
@@ -147,6 +147,8 @@ int zc_save_into_pool(struct zc_control **zc_ctl,
 int zc_release_pool(struct zc_control **zc_ctl, 
 				 unsigned int nr_cpus,
 				 struct zc_pool *pool);
+
+int zc_ctl_enable_sniff(struct zc_control *zc, int enable, int id);
 
 
 #endif /* __INT_H */
