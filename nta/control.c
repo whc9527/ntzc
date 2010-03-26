@@ -118,7 +118,7 @@ int zc_ctl_set_sniff(struct zc_control *zc, struct zc_sniff *zs)
 
 	err = ioctl(zc->fd, ZC_SET_SNIFF, zs);
 	if(err) {
-		fprintf(stderr, "Failed to setup sniff mode.\n");
+		perror("Failed to setup sniff mode: ");
 		return err;
 	}
 	return 0;
