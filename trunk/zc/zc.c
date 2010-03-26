@@ -527,7 +527,7 @@ static int zc_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 				if(i<0 || i> ZC_MAX_NETDEVS 
 					|| sniff.sniff_mode > ZC_SNIFF_ALL
 					|| sniff.sniff_mode < 0
-					|| !zc->netdev[i]){
+					|| !zc_sniffer[0].netdev[i]){
 					ret = -EINVAL;
 					break;
 				}
