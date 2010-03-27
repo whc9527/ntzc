@@ -23,102 +23,7 @@
 #ifndef __BVL_H
 #define __BVL_H
 
-#ifndef IFNAMSIZ
-#define	IFNAMSIZ	16
-#endif
-
-struct m_buf;
-/*
- * Zero-copy allocation control block.
- * @ptr - pointer to allocated data.
- * @off - offset inside given @avl_node_entry pages (absolute number of bytes)
- * @size - size of the appropriate object
- * @entry - number of @avl_node_entry which holds allocated object
- */
-
-struct zc_data
-{
-	union {
-		__u32		data[2];
-		void		*ptr;
-	} data;
-
-	__u32			off;
-	__u16			s_size;  /* the chunk size */
-	__u16			r_size;  /* the packet size */
-
-	__u16			entry;
-	__u8			cpu;
-	__u8			netdev_index;
-};
-
-#define ZC_MAX_ENTRY_NUM	170
-
-/*
- * Zero-copy allocation request.
- * @type - type of the message - ipv4/ipv6/...
- * @res_len - length of reserved area at the beginning.
- * @data - allocation control block.
- */
-struct zc_alloc_ctl
-{
-	__u16		proto;
-	__u16		res_len;
-	struct zc_data	zc;
-};
-
-struct zc_entry_status
-{
-	__u16		node_order, node_num;
-};
-
-struct zc_status
-{
-	unsigned int	entry_num;
-	struct zc_entry_status	entry[ZC_MAX_ENTRY_NUM];
-};
-
-struct zc_netdev
-{
-	char dev_name[IFNAMSIZ];
-	int index;
-};
-
-struct zc_sniff
-{
-	int sniff_id;
-	int dev_index;
-	int sniff_mode;
-#define ZC_SNIFF_NONE		0
-#define ZC_SNIFF_RX			1
-#define ZC_SNIFF_TX			2
-#define ZC_SNIFF_ALL		3
-	u_int16_t	pre_p;		
-#define ZC_PRE_P_NPCP		0x8050
-#define ZC_PRE_P_NORMAL		0
-	u_int16_t	pre_type;
-#define ZC_PRE_P_ALL		0
-#define ZC_PRE_P_CONRTOL	0x20
-#define ZC_PRE_P_PACKET		0x10
-#define ZC_PRE_P_SESSION	0x11
-
-	u_int32_t acl_index;
-	
-};
-
-#define ZC_ALLOC			_IOWR('Z', 1, struct zc_alloc_ctl)
-#define ZC_COMMIT			_IOR('Z', 2, struct zc_alloc_ctl)
-#define ZC_SET_CPU			_IOR('Z', 3, int)
-#define ZC_STATUS			_IOWR('Z', 4, struct zc_status)
-#define ZC_SET_SNIFF		_IOWR('Z', 5, struct zc_sniff)
-#define ZC_GET_NETDEV		_IOWR('Z', 6, struct zc_netdev)
-#define ZC_ENABLE_SNIFF		_IOR('Z', 7, int)
-#define ZC_DISABLE_SNIFF	_IOR('Z', 8, int)
-#define BVL_ORDER		2	/* Maximum allocation order */
-#define BVL_BITS		7	/* Must cover maximum number of pages used for allocation pools */
-
-#define DEFAULT_ZC_NUM	16384
-#define BVL_MAX_NODE_ENTRY_NUM	3
+#include "zc_comm.h"
 
 #ifdef __KERNEL__
 #include <linux/kernel.h>
@@ -135,6 +40,7 @@ struct zc_sniff
 #define ulog(f, a...)
 #endif
 
+struct m_buf;
 /*
  * Network tree allocator variables.
  */
@@ -182,6 +88,7 @@ struct avl_node_entry
 	struct list_head	node_entry;
 	u32		avl_entry_num;
 	u16 	avl_node_order, avl_node_num;
+	u16		avl_node_pages;
 };
 
 
@@ -227,6 +134,7 @@ struct avl_allocator_data
 	struct list_head 	avl_node_list;
 	spinlock_t 		avl_node_lock;
 	u32			avl_node_entry_num;
+	void 	*zc_ring_zone;
 };
 
 
@@ -234,30 +142,27 @@ struct avl_allocator_data
 
 
 void *avl_alloc(unsigned int size, int cpu, gfp_t gfp_mask);
-void avl_free(void *ptr, int dir, int size, int r_size);
+void avl_free(void *ptr, int dir, int r_size);
 int avl_init(void);
 
-void avl_free_no_zc(void *ptr, unsigned int size);
+void avl_free_no_zc(void *ptr);
 
 int avl_init_zc(void);
 void avl_deinit_zc(void);
-void avl_fill_zc(struct zc_data *zc, void *ptr, unsigned int size, int r_size);
+void avl_fill_zc(struct zc_data *zc, void *ptr, int r_size);
 
-#define ZC_MAX_NETDEVS		8
-#define ZC_MAX_SNIFFERS		3
 
 struct zc_control
 {
 	int bind;
-
-	struct zc_data		*zcb;
-	unsigned int		zc_num, zc_used, zc_pos, zc_max;
 	
 	struct zc_sniff 	sniffer[ZC_MAX_NETDEVS];
 	struct net_device*	netdev[ZC_MAX_NETDEVS];
 	int		(*hard_start_xmit) (struct m_buf *mbuf,
 							struct net_device *dev);
-
+	struct zc_data		*zcb;
+	unsigned int		zc_num, zc_max;
+	__u16	zc_used, zc_pos;
 	spinlock_t		zc_lock;
 	wait_queue_head_t	zc_wait;
 };

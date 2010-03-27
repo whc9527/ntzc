@@ -131,7 +131,7 @@ struct m_buf *__alloc_mbuf(unsigned int size, gfp_t gfp_mask)
 
 	/* Get the DATA. Size must match mbuf_add_mtu(). */
 	size = MBUF_DATA_ALIGN(size);
-	data = avl_alloc(size + sizeof(struct mbuf_shared_info), smp_processor_id(), gfp_mask);
+	data = avl_alloc(size + sizeof(struct mbuf_shared_info), smp_processor_id()%NTA_NR_CPUS, gfp_mask);
 	if (!data)
 		goto nodata;
 
@@ -256,8 +256,8 @@ static void mbuf_release_data(struct m_buf *mbuf)
 		}
 		//printk("sniffer %i result 0x%x\n", i, sniff);
 	}
-	
-	avl_free(mbuf->head, sniff, mbuf->truesize-sizeof(struct m_buf)+ sizeof(struct mbuf_shared_info), mbuf->len);
+	sniff = !sniff? mbuf->sniff : sniff;
+	avl_free(mbuf->head, sniff, mbuf->len);
 }
 
 
@@ -380,7 +380,7 @@ static void nta_test_func(unsigned long data)
 		}
 		mbuf->len = 256;
 		mbuf->dir = NTA_DIR_RX;
-
+		mbuf->sniff = 1;
 		sig = (struct sig*)mbuf->data;
 		sig->count = count_a;
 		sig->stamp = jiffies;
@@ -446,6 +446,14 @@ int nta_proc_deinit(void)
 	return 0;
 }
 
+struct net_device test_dev;
+static int	test_hard_start_xmit(struct m_buf *mbuf,
+							struct net_device *dev)
+{
+	nta_kfree_mbuf(mbuf);
+	return 0;
+}
+	
 static int __init
 nta_init_module(void)
 {
@@ -487,7 +495,10 @@ nta_init_module(void)
 
 	nta_proc_init();
 
-#if 0
+#if 1
+	memcpy(&test_dev.name, "fuck", 4);
+	test_dev.name[4]=0;
+	nta_register_zc(&test_dev, test_hard_start_xmit);
 	test_timer.function = &nta_test_func;
 	init_timer(&test_timer);
 	count_a = 0ul;
