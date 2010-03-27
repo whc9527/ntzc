@@ -43,7 +43,7 @@
 
 #include "control.h"
 
-struct zc_control *zc_ctl[NTA_NR_CPUS];
+struct zc_user_control *zc_ctl[NTA_NR_CPUS];
 
 static inline __u32 num2ip(__u8 a0, __u8 a1, __u8 a2, __u8 a3)
 {
@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
 	unsigned int nr_cpus;
 	char *ctl_file;
 	struct zc_data *e;
-	struct zc_control *ctl;
+	struct zc_user_control *ctl;
 	void *ptr;
 	struct iphdr *iph;
 	int i;
