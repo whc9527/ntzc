@@ -46,7 +46,7 @@
 
 #include "control.h"
 
-struct zc_control *zc_ctl[NR_CPUS];
+struct zc_user_control *zc_ctl[NTA_NR_CPUS];
 
 unsigned long g_count, g_num_read, g_num_write;
 static int terminated;
@@ -133,13 +133,13 @@ int main(int argc, char *argv[])
 	char *ctl_file, *ifname;
 	int dev_index;
 	struct pollfd *pfd;
-	struct zc_control *ctl;
+	struct zc_user_control *ctl;
 
 	int my_sniifer_id = 1;
 
 
 	ctl_file = ifname = NULL;
-	nr_cpus = NR_CPUS;
+	nr_cpus = NTA_NR_CPUS;
 	g_count = 0;
 	while ((ch = getopt(argc, argv, "f:i:c:h")) != -1) {
 		switch (ch) {
@@ -164,13 +164,13 @@ int main(int argc, char *argv[])
 		zc_usage(argv[0]);
 		return -1;
 	}
-
+#if 0
 	if(!ifname){
 		fprintf(stderr, "You must specify NIC interface name.\n");
 		zc_usage(argv[0]);
 		return -1;
 	}
-	
+#endif	
 	{
 		struct sigaction sa = { { 0 } };
 
