@@ -44,7 +44,7 @@ unsigned long
 
 struct avl_allocator_data avl_allocator[NR_CPUS];
 
-#define avl_ptr_to_chunk(ptr, size)	(struct avl_chunk *)(ptr + BVL_MEM_SIZE)
+#define avl_ptr_to_chunk(ptr)	(struct avl_chunk *)(ptr + BVL_MEM_SIZE)
 
 /*
  * Get node pointer from address.
@@ -120,7 +120,7 @@ static inline int avl_ptr_to_offset(void *ptr)
 /*
  * Fill zc_data structure for given pointer and node.
  */
-static void __avl_fill_zc(struct zc_data *zc, void *ptr, unsigned int size, struct avl_node *node, int r_size)
+static void __avl_fill_zc(struct zc_data *zc, void *ptr, struct avl_node *node, int r_size)
 {
 	u32 off;
 
@@ -131,7 +131,7 @@ static void __avl_fill_zc(struct zc_data *zc, void *ptr, unsigned int size, stru
 	//	   off, avl_ptr_to_offset(ptr), ptr, node, sizeof(struct avl_node), node->entry->avl_node_order, node->value);
 
 	zc->data.ptr = ptr;
-	zc->s_size = size;
+	//zc->s_size = size;
 	zc->r_size = r_size;
 	zc->entry = node->entry->avl_entry_num;
 	zc->cpu = avl_get_cpu_ptr((unsigned long)ptr);
@@ -141,11 +141,11 @@ static void __avl_fill_zc(struct zc_data *zc, void *ptr, unsigned int size, stru
 
 }
 
-void avl_fill_zc(struct zc_data *zc, void *ptr, unsigned int size, int r_size)
+void avl_fill_zc(struct zc_data *zc, void *ptr, int r_size)
 {
 	struct avl_node *node = avl_get_node_ptr((unsigned long)ptr);
 
-	__avl_fill_zc(zc, ptr, size, node, r_size);
+	__avl_fill_zc(zc, ptr, node, r_size);
 
 	
 	//printk("%s: ptr: %p, size: %u, off: %u, node: entry: %u, order: %u, number: %u.\n",
@@ -154,36 +154,57 @@ void avl_fill_zc(struct zc_data *zc, void *ptr, unsigned int size, int r_size)
 
 }
 
+static inline int avl_zc_ring_unused(struct zc_control *zc)
+{
+	if (zc->zc_used > zc->zc_pos)
+		return zc->zc_used - zc->zc_pos - 1;
+
+	return zc->zc_num + zc->zc_used - zc->zc_pos - 1;
+}
+
 /*
  * Update zero-copy information in given @node.
  * @node - node where given pointer @ptr lives
  * @num - number of @BVL_MIN_SIZE chunks given pointer @ptr embeds
  */
-static void avl_update_zc(struct avl_node *node, void *ptr, int size, int r_size, int i)
+static void avl_update_zc(struct avl_node *node, void *ptr, int r_size, int i)
 {
 	struct zc_control *ctl = &zc_sniffer[i];
-	//int cpu = avl_get_cpu_ptr((unsigned long)ptr);
 	unsigned long flags;
+	int pos;
 
 	spin_lock_irqsave(&ctl->zc_lock, flags);
-	if (ctl->zc_used < ctl->zc_num) {
-		struct zc_data *zc = &ctl->zcb[ctl->zc_pos];
-		struct avl_chunk *ch = avl_ptr_to_chunk(ptr, size);
+	if(avl_zc_ring_unused(ctl)) {
+		pos = ctl->zc_pos;
+	}else{
+		count_miss[i]++;
+		spin_unlock_irqrestore(&ctl->zc_lock, flags);
+		return;
+	}
+	spin_unlock_irqrestore(&ctl->zc_lock, flags);
 
-		if (++ctl->zc_pos >= ctl->zc_num)
-			ctl->zc_pos = 0;
+	do {
+		struct zc_data *zc = &ctl->zcb[pos];
+		struct avl_chunk *ch = avl_ptr_to_chunk(ptr);;
 
 		atomic_inc(&ch->refcnt);
 		count_update[i]++;
-		__avl_fill_zc(zc, ptr, size, node, r_size);
+		__avl_fill_zc(zc, ptr, node, r_size);
 
-		ctl->zc_used++;
+		pos++;
+		if(pos == ctl->zc_num) {
+			pos = 0;
+		}
+
 		wake_up(&ctl->zc_wait);
 
 		ulog("%s: used: %u, pos: %u, num: %u, ptr: %p, size: %u, off: %u.\n",
 				__func__, ctl->zc_used, ctl->zc_pos, ctl->zc_num, ptr, zc->size, zc->off);
-	}else
-		count_miss[i]++;
+	}while(0);
+
+	spin_lock_irqsave(&ctl->zc_lock, flags);
+	ctl->zc_pos = pos;
+	ctl->zc_max = 1;
 
 	spin_unlock_irqrestore(&ctl->zc_lock, flags);
 }
@@ -192,10 +213,10 @@ static void avl_update_zc(struct avl_node *node, void *ptr, int size, int r_size
 /*
  * Free memory region of given size.
  */
-static void __avl_free(void *ptr, unsigned int size)
+static void __avl_free(void *ptr)
 {
 	int cpu = avl_get_cpu_ptr((unsigned long)ptr);
-	struct avl_chunk *ch = avl_ptr_to_chunk(ptr, size);
+	struct avl_chunk *ch = avl_ptr_to_chunk(ptr);
 	struct avl_free_list *l, *this = ptr;
 	struct avl_allocator_data *alloc = &avl_allocator[cpu];
 
@@ -212,23 +233,23 @@ static void __avl_free(void *ptr, unsigned int size)
 /*
  * Free memory region of given size without sniffer data update.
  */
-void avl_free_no_zc(void *ptr, unsigned int size)
+void avl_free_no_zc(void *ptr)
 {
 	unsigned long flags;
 	//struct avl_free_list *l;
 	//struct avl_allocator_data *alloc;
-	struct avl_chunk *ch = avl_ptr_to_chunk(ptr, size);
+	struct avl_chunk *ch = avl_ptr_to_chunk(ptr);
 
-	if (unlikely((ch->canary != BVL_CANARY) || ch->size != size)) {
-		printk("Freeing destroyed object: ptr: %p, ch %p, size: %u, canary: %x, must be %x, refcnt: %d, saved size: %u.\n",
-				ptr, ch, size, ch->canary, BVL_CANARY, atomic_read(&ch->refcnt), ch->size);
+	if (unlikely((ch->canary != BVL_CANARY))) {
+		printk("Freeing destroyed object: ptr: %p, ch %p, canary: %x, must be %x, refcnt: %d, saved size: %u.\n",
+				ptr, ch, ch->canary, BVL_CANARY, atomic_read(&ch->refcnt), ch->size);
         WARN_ON("avl_free_no_zc");
         return;
 	}
 
 	if (atomic_dec_and_test(&ch->refcnt)) {
 		local_irq_save(flags);
-		__avl_free(ptr, size);
+		__avl_free(ptr);
 		local_irq_restore(flags);
 	}
 }
@@ -236,25 +257,25 @@ void avl_free_no_zc(void *ptr, unsigned int size)
 /*
  * Free memory region of given size.
  */
-void avl_free(void *ptr, int sniff, int size, int r_size)
+void avl_free(void *ptr, int sniff, int r_size)
 {
-	struct avl_chunk *ch = avl_ptr_to_chunk(ptr, size);
+	struct avl_chunk *ch = avl_ptr_to_chunk(ptr);
 	int i;
 
-	if (unlikely((ch->canary != BVL_CANARY) || ch->size != size)) {
-		printk("Freeing destroyed object: ptr: %p, ch: %p size: %u, canary: %x, must be %x, refcnt: %d, saved size: %u.\n",
-				ptr, ch, size, ch->canary, BVL_CANARY, atomic_read(&ch->refcnt), ch->size);
+	if (unlikely((ch->canary != BVL_CANARY))) {
+		printk("Freeing destroyed object: ptr: %p, ch: %p, canary: %x, must be %x, refcnt: %d, saved size: %u.\n",
+				ptr, ch, ch->canary, BVL_CANARY, atomic_read(&ch->refcnt), ch->size);
         WARN_ON("avl_free");
         return;
 	}
 
 	for(i=0; i< ZC_MAX_SNIFFERS; i++){
 		if(sniff & (1<<i)) {
-			avl_update_zc(avl_get_node_ptr((unsigned long)ptr), ptr, size, r_size, i);
+			avl_update_zc(avl_get_node_ptr((unsigned long)ptr), ptr, r_size, i);
 		}
 	}
 	
-	avl_free_no_zc(ptr, size);
+	avl_free_no_zc(ptr);
 }
 
 /*
@@ -277,6 +298,12 @@ static void avl_scan(int cpu)
 
 	//spin_lock_irqsave(&alloc->avl_node_lock, flags);
 	list_for_each_entry(e, &alloc->avl_node_list, node_entry) {
+		if(e->avl_entry_num == BVL_MAX_NODE_ENTRY_NUM) {
+			printk("node for sniffer ring on CPU %d, not scanning...\n", cpu);
+			BUG_ON( (cpu!=0) );
+			alloc->zc_ring_zone = (void*)e->avl_node_array[0][0].value;
+			continue;
+		}
 		num = e->avl_node_num; //*(1<<e->avl_node_order);
 
 		idx = 0;
@@ -300,7 +327,7 @@ static void avl_scan(int cpu)
 				l = alloc->avl_free_list_head;
 				alloc->avl_free_list_head = this;
 				this->next = l;
-				ch = avl_ptr_to_chunk((void*)this, osize);
+				ch = avl_ptr_to_chunk((void*)this);
 				//printk("%p] ", ch);
 				atomic_set(&ch->refcnt, 0);
 				ch->canary = BVL_UNUSE_MAGIC;
@@ -346,7 +373,7 @@ void *avl_alloc(unsigned int size, int cpu, gfp_t gfp_mask)
 
 	if(l) {
 		struct avl_chunk *ch;
-		ch = avl_ptr_to_chunk((void *)l, osize);
+		ch = avl_ptr_to_chunk((void *)l);
 		atomic_set(&ch->refcnt, 1);
 		ch->canary = BVL_CANARY;
 		ch->size = osize;
@@ -464,6 +491,7 @@ static struct avl_node_entry *avl_node_entry_alloc(gfp_t gfp_mask, int order)
 
 		for (j=0; j<(1<<order); ++j){
 			count_page++;
+			entry->avl_node_pages++;
 			get_page(virt_to_page(ptr + (j<<PAGE_SHIFT)));
 		}
 
@@ -498,7 +526,7 @@ err_out_free_entry:
  */
 static int avl_init_cpu(int cpu)
 {
-	unsigned int i;
+	unsigned int i, num;
 	struct avl_allocator_data *alloc = &avl_allocator[cpu];
 	struct avl_node_entry *entry;
 
@@ -506,7 +534,11 @@ static int avl_init_cpu(int cpu)
 	spin_lock_init(&alloc->avl_node_lock);
 	INIT_LIST_HEAD(&alloc->avl_node_list);
 
-	for (i=0; i<BVL_MAX_NODE_ENTRY_NUM; i++)
+	if(cpu == 0) {
+		num = BVL_MAX_NODE_ENTRY_NUM+1;
+	}else
+		num = BVL_MAX_NODE_ENTRY_NUM;
+	for (i=0; i<num; i++)
 	{
 		entry = avl_node_entry_alloc(GFP_KERNEL, BVL_ORDER);
 		if (!entry)
@@ -530,7 +562,7 @@ int avl_init(void)
 {
 	int err, cpu;
 
-	for_each_possible_cpu(cpu) {
+	for(cpu=0; cpu<NTA_NR_CPUS; cpu++) {
 		err = avl_init_cpu(cpu);
 		if (err)
 			goto err_out;
