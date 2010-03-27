@@ -57,9 +57,9 @@ do {\
 }while(0)
 
 
-static struct zc_data zcb[NR_CPUS][DEFAULT_ZC_NUM];
+static struct zc_data *zcb[ZC_MAX_SNIFFERS];
 
-static int zc_mmap(struct zc_control *ctl, struct zc_status *st)
+static int zc_mmap(struct zc_user_control *ctl, struct zc_status *st)
 {
 	struct zc_data *e;
 	unsigned int entry_num = st->entry_num;
@@ -86,13 +86,19 @@ static int zc_mmap(struct zc_control *ctl, struct zc_status *st)
 				i, st->entry_num, ctl->cpu, e->data.ptr, ent->node_num, ent->node_order, ctl->offset);
 		ctl->offset += (1<<ent->node_order)*ent->node_num;
 		e->entry = i;
-
+		if(i==(entry_num-1)) {
+			int j;
+			for(j=0; j<ZC_MAX_SNIFFERS; j++){
+				zcb[j] = (struct zc_data*)(e->data.ptr+j*ctl->ring_num*sizeof(struct zc_data));
+				printf("mmap ring zone: zcb[%d] %p entry %p\n", j, zcb[j], e->data.ptr);
+			}
+		}
 	}
 
 	return 0;
 }
 
-static int zc_prepare(struct zc_control *ctl)//, unsigned int entry_num)
+static int zc_prepare(struct zc_user_control *ctl)//, unsigned int entry_num)
 {
 	int err;
 	struct zc_status st;
@@ -112,7 +118,7 @@ static int zc_prepare(struct zc_control *ctl)//, unsigned int entry_num)
 	return 0;
 }
 
-int zc_ctl_set_sniff(struct zc_control *zc, struct zc_sniff *zs)
+int zc_ctl_set_sniff(struct zc_user_control *zc, struct zc_sniff *zs)
 {
 	int err;
 
@@ -124,18 +130,19 @@ int zc_ctl_set_sniff(struct zc_control *zc, struct zc_sniff *zs)
 	return 0;
 }
 
-int zc_ctl_enable_sniff(struct zc_control *zc, int enable, int id)
+int zc_ctl_enable_sniff(struct zc_user_control *zc, int enable, int id)
 {
 	int err;
 	int command = enable? ZC_ENABLE_SNIFF: ZC_DISABLE_SNIFF;
 
+	zc->sniffer_id = id;
 	err = ioctl(zc->fd, command, &id);
 
 	return err;
 
 }
 
-int zc_ctl_get_devid(struct zc_control *zc, char *dev_name)
+int zc_ctl_get_devid(struct zc_user_control *zc, char *dev_name)
 {
 	int err;
 	struct zc_netdev zn;
@@ -152,22 +159,22 @@ int zc_ctl_get_devid(struct zc_control *zc, char *dev_name)
 
 static char default_ctl_file[] = "/dev/zc";
 
-struct zc_control *zc_ctl_init(int cpu_id, char *ctl_file)
+struct zc_user_control *zc_ctl_init(int cpu_id, char *ctl_file)
 {
 	int err;
-	struct zc_control  *ctl;
+	struct zc_user_control  *ctl;
 
     if(!ctl_file) {
         ctl_file = default_ctl_file;
     }
-	ctl = malloc(sizeof(struct zc_control));
+	ctl = malloc(sizeof(struct zc_user_control));
 
 	if (!ctl) {
 		fprintf(stderr, "Failed to allocate control structures for CPU %d.\n", cpu_id);
 		return NULL;
 	}
 
-	memset(ctl, 0, sizeof(struct zc_control));
+	memset(ctl, 0, sizeof(struct zc_user_control));
 
 	do {
 		ctl->cpu = cpu_id; 
@@ -183,6 +190,7 @@ struct zc_control *zc_ctl_init(int cpu_id, char *ctl_file)
 			fprintf(stderr, "Failed to setup CPU %d.\n", ctl->cpu);
 			return NULL;
 		}
+		ctl->ring_num = SNIFFER_RING_NODES/ZC_MAX_SNIFFERS;
 		if (zc_prepare(ctl)){
 			close(ctl->fd);
 			fprintf(stderr, "Failed to prepare CPU%d.\n", ctl->cpu);
@@ -194,7 +202,7 @@ struct zc_control *zc_ctl_init(int cpu_id, char *ctl_file)
 }
 
 struct pollfd *_pfd;
-int zc_ctl_prepare_polling(struct zc_control **zc_ctl, unsigned int nr_cpus)
+int zc_ctl_prepare_polling(struct zc_user_control **zc_ctl, unsigned int nr_cpus)
 {
     int i;
     if(_pfd) {
@@ -216,14 +224,16 @@ int zc_ctl_prepare_polling(struct zc_control **zc_ctl, unsigned int nr_cpus)
 	return 0;
 }
 
-int zc_recv_loop(struct zc_control **zc_ctl, 
+int zc_recv_loop(struct zc_user_control **zc_ctl, 
 				 unsigned int nr_cpus,
 				 char * param,
 				 void (*zc_analyze)(void *ptr, int length, char *param))
 {
-		int poll_ready, i, j;
+		int poll_ready, i, j, pos;
 		int err;
 		unsigned int num, t_num=0;
+		struct zc_ring ring;
+		struct zc_data *zcr;
 
 		poll_ready = poll(_pfd, nr_cpus, 1000);
 		if (poll_ready == 0){
@@ -239,22 +249,26 @@ int zc_recv_loop(struct zc_control **zc_ctl,
 			_pfd[j].events = POLLIN;
 			_pfd[j].revents = 0;
 
-			err = read(zc_ctl[j]->fd, zcb[j], sizeof(zcb[j]));
+			err = read(zc_ctl[j]->fd, &ring, sizeof(ring));
 			if (err <= 0) {
 				fprintf(stderr, "Failed to read data from control file: %s [%d].\n", 
 						strerror(errno), errno);
 				return -2;
 			}
-
-			num = err; // /sizeof(struct zc_data);
+			zcr = zcb[zc_ctl[j]->sniffer_id];
+			num = err; 
 			t_num += num;
+			pos = ring.zc_used;
 			for (i=0; i<num; ++i) {
 				struct zc_data *z;
 				char *ptr;
 				struct zc_data *e;
 
-				z = &zcb[j][i];
+				z = &zcr[pos++];
 
+				if(pos == zc_ctl[j]->ring_num ) {
+					pos = 0;
+				}
 				if (z->entry >= ZC_MAX_ENTRY_NUM )// || z->cpu >= nr_cpus)
 					continue;
 
@@ -274,25 +288,28 @@ int zc_recv_loop(struct zc_control **zc_ctl,
 				//zc_analyze_write(out_fd, ptr, z->size);
 				(*zc_analyze)(ptr, z->r_size, param);
 			}
-			err = write(zc_ctl[j]->fd, zcb[j], num*sizeof(struct zc_data));
+			err = write(zc_ctl[j]->fd, &ring, sizeof(ring));
 			if (err < 0) {
 				fprintf(stderr, "Failed to write data to control file: %s [%d].\n", 
 						strerror(errno), errno);
 				return -3;
-			} else if (err == 0) {
-				write(zc_ctl[j]->fd, zcb, num*sizeof(struct zc_data));
+			} 
+			if(err!=num) {
+				printf("!!! read %d but write %d\n", num, err);
 			}
 		}
 		return t_num;
 }
 
-int zc_save_into_pool(struct zc_control **zc_ctl, 
+int zc_save_into_pool(struct zc_user_control **zc_ctl, 
 				 unsigned int nr_cpus,
 				 struct zc_pool *pool)
 {
-	int poll_ready, i, j;
+	int poll_ready, i, j, pos;
 	int err;
 	unsigned int num, t_num=0;
+	struct zc_ring ring;
+	struct zc_data *zcr;
 
 	poll_ready = poll(_pfd, nr_cpus, 1000);
 	if (poll_ready == 0){
@@ -304,68 +321,75 @@ int zc_save_into_pool(struct zc_control **zc_ctl,
 	for (j=0; j<poll_ready; ++j) {
 		if ((!_pfd[j].revents & POLLIN))
 			continue;
-			
+
 		_pfd[j].events = POLLIN;
 		_pfd[j].revents = 0;
 
-		err = read(zc_ctl[j]->fd, zcb[j], sizeof(zcb[0]));
+		err = read(zc_ctl[j]->fd, &ring, sizeof(ring));
 		if (err <= 0) {
 			fprintf(stderr, "Failed to read data from control file: %s [%d].\n", 
 					strerror(errno), errno);
 			return -2;
 		}
-
-		num = err; // /sizeof(struct zc_data);
+		zcr = zcb[zc_ctl[j]->sniffer_id];
+		num = err; 
 		t_num += num;
+		pos = ring.zc_used;
 		for (i=0; i<num; ++i) {
 			struct zc_data *z;
-			void *ptr;
+			char *ptr;
 			struct zc_data *e;
 
-			z = &zcb[z->cpu][i];
+			z = &zcr[pos++];
 
-			if (z->entry >= ZC_MAX_ENTRY_NUM || z->cpu >= nr_cpus)
+			if(pos == zc_ctl[j]->ring_num ) {
+				pos = 0;
+			}
+			if (z->entry >= ZC_MAX_ENTRY_NUM )// || z->cpu >= nr_cpus)
 				continue;
 
 			e = &zc_ctl[z->cpu]->node_entries[z->entry];
 
-#if 1 
-				//printf("dump %4d.%4d: ptr: %p, size: %u, off: %u: entry: %u, cpu: %d\n", 
-				//	i, num, z->data.ptr, z->size, z->off, z->entry, z->cpu);
+#if 0 
+			printf("dump %4d.%4d: ptr: %p, size: %u, off: %u: entry: %u, cpu: %d\n", 
+				i, num, z->data.ptr, z->r_size, z->off, z->entry, z->cpu);
 #endif
 			ptr = e->data.ptr + z->off;
+
+			//dump_skb("1", ptr, 64);
 			ptr += 66; // (NET_MBUF_PAD_ALLOC+NET_IP_ALIGN);
-			//ptr = e->data.ptr;
-			//zc_analyze_write(out_fd, ptr, z->size);
+			//dump_skb("2", ptr, 64);
 			pool->_pool[i] = ptr;
 			pool->_len[i] = z->r_size;
+			pool->num++;
+			pool->ring_rec[j].zc_pos = ring.zc_pos;
+			pool->ring_rec[j].zc_used = ring.zc_used;
 		}
-		pool->num[j] = num;
 	}
-	return 0;
+	return pool->num; //t_num;
 }
 
-int zc_release_pool(struct zc_control **zc_ctl, 
+int zc_release_pool(struct zc_user_control **zc_ctl, 
 				 unsigned int nr_cpus,
 				 struct zc_pool *pool)
 {
 	int err;
 	int i;
-
-	for(i=0; i<NR_CPUS; i++) {
-		err = write(zc_ctl[i]->fd, zcb[i], pool->num[i]*sizeof(struct zc_data));
-		if (err < 0) {
-			fprintf(stderr, "Failed to write data to control file: %s [%d].\n", 
-					strerror(errno), errno);
-			continue;
-		} else if (err == 0) {
-			write(zc_ctl[i]->fd, zcb[i], pool->num[i]*sizeof(struct zc_data));
+	
+	for(i=0; i<nr_cpus; i++) {
+		if(*(u_int32_t*)&pool->ring_rec[i]) {
+			err = write(zc_ctl[i]->fd, &pool->ring_rec[i], sizeof(struct zc_ring));
+			if (err < 0) {
+				fprintf(stderr, "Failed to write data to control file: %s [%d].\n", 
+						strerror(errno), errno);
+				continue;
+			} 
 		}
 	}
 	return 0;
 }
 
-void * zc_alloc_buffer(struct zc_control *ctl,
+void * zc_alloc_buffer(struct zc_user_control *ctl,
                        struct zc_alloc_ctl *alloc_ctl)
 {
     struct zc_data *z, *e;
@@ -395,7 +419,7 @@ void * zc_alloc_buffer(struct zc_control *ctl,
     return ptr;
 }
 
-int zc_commit_buffer(struct zc_control *ctl, struct zc_alloc_ctl *alloc_ctl)
+int zc_commit_buffer(struct zc_user_control *ctl, struct zc_alloc_ctl *alloc_ctl)
 {
     int err;
 	
@@ -407,7 +431,7 @@ int zc_commit_buffer(struct zc_control *ctl, struct zc_alloc_ctl *alloc_ctl)
     return 0;
 }
 
-void zc_ctl_shutdown(struct zc_control *zc)
+void zc_ctl_shutdown(struct zc_user_control *zc)
 {
     close(zc->fd);
     if(_pfd){

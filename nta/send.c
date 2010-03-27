@@ -40,12 +40,10 @@
 #include <netinet/ip.h>
 
 #include <linux/types.h>
-#include <linux/if.h>
 
 #include "control.h"
 
-#define NR_CPUS	2
-struct zc_control *zc_ctl[NR_CPUS];
+struct zc_control *zc_ctl[NTA_NR_CPUS];
 
 static inline __u32 num2ip(__u8 a0, __u8 a1, __u8 a2, __u8 a3)
 {
