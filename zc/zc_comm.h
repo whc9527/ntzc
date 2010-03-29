@@ -97,7 +97,7 @@ struct zc_sniff
 #define ZC_MAX_SNIFFERS		4
 
 #define DEFAULT_ZC_NUM	16384
-#define BVL_MAX_NODE_ENTRY_NUM	3
+#define BVL_MAX_NODE_ENTRY_NUM	20
 
 #define SNIFFER_RING_PAGES 1024
 #define SNIFFER_RING_NODES	(SNIFFER_RING_PAGES*(PAGE_SIZE/sizeof(struct zc_data)/ZC_MAX_SNIFFERS))
