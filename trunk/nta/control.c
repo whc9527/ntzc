@@ -39,7 +39,7 @@
 #include <netinet/ip.h>
 
 #include <linux/types.h>
-#include <linux/if.h>
+#include <net/if.h>
 
 #include "control.h"
 
@@ -86,7 +86,7 @@ static int zc_mmap(struct zc_user_control *ctl, struct zc_status *st)
 				i, st->entry_num, ctl->cpu, e->data.ptr, ent->node_num, ent->node_order, ctl->offset);
 		ctl->offset += (1<<ent->node_order)*ent->node_num;
 		e->entry = i;
-		if(i==(entry_num-1)) {
+		if(i==(entry_num-1) && ctl->cpu == 0) {
 			int j;
 			for(j=0; j<ZC_MAX_SNIFFERS; j++){
 				zcb[j] = (struct zc_data*)(e->data.ptr+j*ctl->ring_num*sizeof(struct zc_data));
@@ -258,7 +258,8 @@ int zc_recv_loop(struct zc_user_control **zc_ctl,
 						strerror(errno), errno);
 				return -2;
 			}
-			//printf("read from ring: num = %d used = %d pos = %d\n", err, ring.zc_used, ring.zc_pos);
+			//printf("read from zc_ctl[%d]->sniffer_id %d ring: num = %d used = %d pos = %d\n", 
+			//	   j, zc_ctl[j]->sniffer_id, err, ring.zc_used, ring.zc_pos);
 			zcr = zcb[zc_ctl[j]->sniffer_id];
 			num = err; 
 			t_num += num;

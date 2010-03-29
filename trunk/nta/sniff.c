@@ -78,6 +78,20 @@ static void zc_usage(char *p)
 	((unsigned char *)&addr)[3]
 
 
+#define dump_skb(s, p, l) \
+do {\
+    int i;\
+    printf("\n%s %s packet: \n", __FUNCTION__, s);\
+    for(i=0; i<l; i++) {\
+		printf("%02x ", p[i]&0xff); \
+        if((i+1)%8==0) {\
+            printf( "\n");\
+        }\
+    } \
+    printf( "\n"); \
+}while(0)
+
+
 static void zc_analyze(void *ptr, int length, char *nouse)
 {
 	struct ether_header *eth;
@@ -85,18 +99,12 @@ static void zc_analyze(void *ptr, int length, char *nouse)
 	struct tcphdr *th;
 	unsigned char *p = ptr;
 	__u16 sport, dport;
-	struct test_sig{
-		unsigned long count;
-		unsigned long timestamp;
-	}*sig;
 
-	ptr += 64;
-	eth = ptr+2;
-	sig = (struct test_sig*)ptr;
+	ptr += 32;
+	eth = ptr;
 
-	if(terminated) {
-		return;
-	}
+	g_count ++;
+	//dump_skb("test", p, 128);
 
 #if 0
 	if (eth->ether_type == ntohs(ETHERTYPE_IP)){
@@ -108,15 +116,15 @@ static void zc_analyze(void *ptr, int length, char *nouse)
 				length, NIPQUAD(iph->saddr), NIPQUAD(iph->daddr), ntohs(eth->ether_type), iph->protocol);
 
 		if(iph->protocol == IPPROTO_TCP) {
-			printf(" port %u -> %u", ntohs(sport), ntohs(dport));
+			//printf(" port %u -> %u", ntohs(sport), ntohs(dport));
 			th = (struct tcphdr *)(((void *)iph) + (iph->ihl<<2));
-			printf("seq: %u, ack: %u, ", ntohl(th->seq), ntohl(th->ack_seq));
+			//printf("seq: %u, ack: %u, ", ntohl(th->seq), ntohl(th->ack_seq));
 		}
 		if(iph->protocol == IPPROTO_UDP) {
-			printf(" port %u -> %u", ntohs(sport), ntohs(dport));
+			//printf(" port %u -> %u", ntohs(sport), ntohs(dport));
 		}
 	}
-	printf("\n");
+	//printf("\n");
 #endif
 	return;
 }

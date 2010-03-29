@@ -136,8 +136,8 @@ static void __avl_fill_zc(struct zc_data *zc, void *ptr, struct avl_node *node, 
 	zc->entry = node->entry->avl_entry_num;
 	zc->cpu = avl_get_cpu_ptr((unsigned long)ptr);
 
-	//printk("%s: ptr: %p, size: %u, off: %u, cpu %d, entry %d\n",
-	//		__func__, ptr, size, zc->off,  zc->cpu, zc->entry);
+	//printk("%s: ptr: %p, off: %u, cpu %d, entry %d\n",
+	//		__func__, ptr, zc->off,  zc->cpu, zc->entry);
 
 }
 
