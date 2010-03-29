@@ -235,26 +235,30 @@ int zc_recv_loop(struct zc_user_control **zc_ctl,
 		struct zc_ring ring;
 		struct zc_data *zcr;
 
+/* 
 		poll_ready = poll(_pfd, nr_cpus, 1000);
 		if (poll_ready == 0){
 			return 0;
 		}
 		if (poll_ready < 0)
 			return -1;
-
+*/
+		poll_ready = 2;
 		for (j=0; j<poll_ready; ++j) {
+#if 0
 			if ((!_pfd[j].revents & POLLIN))
 				continue;
 			
 			_pfd[j].events = POLLIN;
 			_pfd[j].revents = 0;
-
+#endif
 			err = read(zc_ctl[j]->fd, &ring, sizeof(ring));
 			if (err <= 0) {
 				fprintf(stderr, "Failed to read data from control file: %s [%d].\n", 
 						strerror(errno), errno);
 				return -2;
 			}
+			printf("read from ring: num = %d used = %d pos = %d\n", err, ring.zc_used, ring.zc_pos);
 			zcr = zcb[zc_ctl[j]->sniffer_id];
 			num = err; 
 			t_num += num;

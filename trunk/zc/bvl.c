@@ -187,6 +187,8 @@ static void avl_update_zc(struct avl_node *node, void *ptr, int r_size, int i)
 		struct zc_data *zc = &ctl->zcb[pos];
 		struct avl_chunk *ch = avl_ptr_to_chunk(ptr);;
 
+		//printk("fill at pos %d\n", pos);
+
 		atomic_inc(&ch->refcnt);
 		count_update[i]++;
 		__avl_fill_zc(zc, ptr, node, r_size);
@@ -195,7 +197,6 @@ static void avl_update_zc(struct avl_node *node, void *ptr, int r_size, int i)
 		if(pos == ctl->zc_num) {
 			pos = 0;
 		}
-
 		wake_up(&ctl->zc_wait);
 
 		ulog("%s: used: %u, pos: %u, num: %u, ptr: %p, size: %u, off: %u.\n",
@@ -243,7 +244,7 @@ void avl_free_no_zc(void *ptr)
 	if (unlikely((ch->canary != BVL_CANARY))) {
 		printk("Freeing destroyed object: ptr: %p, ch %p, canary: %x, must be %x, refcnt: %d, saved size: %u.\n",
 				ptr, ch, ch->canary, BVL_CANARY, atomic_read(&ch->refcnt), ch->size);
-        WARN_ON("avl_free_no_zc");
+        //WARN_ON("avl_free_no_zc");
         return;
 	}
 
@@ -265,7 +266,7 @@ void avl_free(void *ptr, int sniff, int r_size)
 	if (unlikely((ch->canary != BVL_CANARY))) {
 		printk("Freeing destroyed object: ptr: %p, ch: %p, canary: %x, must be %x, refcnt: %d, saved size: %u.\n",
 				ptr, ch, ch->canary, BVL_CANARY, atomic_read(&ch->refcnt), ch->size);
-        WARN_ON("avl_free");
+        //WARN_ON("avl_free");
         return;
 	}
 

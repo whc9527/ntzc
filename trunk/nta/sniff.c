@@ -98,13 +98,14 @@ static void zc_analyze(void *ptr, int length, char *nouse)
 		return;
 	}
 
-#if 1
-	printf("length %d %u.%u.%u.%u -> %u.%u.%u.%u, proto l3 %x, l4 %u",
-			length, NIPQUAD(iph->saddr), NIPQUAD(iph->daddr), ntohs(eth->ether_type), iph->protocol);
+#if 0
 	if (eth->ether_type == ntohs(ETHERTYPE_IP)){
 		iph = (struct iphdr *)(eth + 1);
 		sport = ((__u16 *)(((void *)iph) + (iph->ihl<<2)))[0];
 		dport = ((__u16 *)(((void *)iph) + (iph->ihl<<2)))[1];
+
+		printf("length %d %u.%u.%u.%u -> %u.%u.%u.%u, proto l3 %x, l4 %u",
+				length, NIPQUAD(iph->saddr), NIPQUAD(iph->daddr), ntohs(eth->ether_type), iph->protocol);
 
 		if(iph->protocol == IPPROTO_TCP) {
 			printf(" port %u -> %u", ntohs(sport), ntohs(dport));
@@ -135,7 +136,7 @@ int main(int argc, char *argv[])
 	struct pollfd *pfd;
 	struct zc_user_control *ctl;
 
-	int my_sniifer_id = 1;
+	int my_sniifer_id = 0;
 
 
 	ctl_file = ifname = NULL;
