@@ -258,7 +258,7 @@ int zc_recv_loop(struct zc_user_control **zc_ctl,
 						strerror(errno), errno);
 				return -2;
 			}
-			printf("read from ring: num = %d used = %d pos = %d\n", err, ring.zc_used, ring.zc_pos);
+			//printf("read from ring: num = %d used = %d pos = %d\n", err, ring.zc_used, ring.zc_pos);
 			zcr = zcb[zc_ctl[j]->sniffer_id];
 			num = err; 
 			t_num += num;
