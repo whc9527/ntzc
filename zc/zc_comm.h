@@ -2,8 +2,9 @@
 #define _ZC_COMMON_H
 
 #ifndef __KERNEL__
+#include <linux/types.h>
 #include <sys/user.h>
-#include <linux/if.h>
+#include <net/if.h>
 #else
 #include <linux/if.h>
 #include <asm/page.h>

@@ -208,7 +208,6 @@ static ssize_t zc_read(struct file *file, char __user *buf, size_t size, loff_t 
 	ring.zc_used = ctl->zc_used;
 	ctl->zc_max = 0;
 	spin_unlock_irqrestore(&ctl->zc_lock, flags);
-
 	if (copy_to_user(buf, &ring, sizeof(ring)))
 		sz = -EFAULT;
 	

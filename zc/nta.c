@@ -238,12 +238,12 @@ static void mbuf_release_data(struct m_buf *mbuf)
 								sniff |= (1<<i);
 							break;
 						case ZC_PRE_P_PACKET:
-							if((mbuf->data[3] == ZC_PRE_P_PACKET) && (mbuf->data[4]&0xf0)==1) {
+							if((mbuf->data[3] == ZC_PRE_P_PACKET) && (mbuf->data[4]&0xf)==0xc) {
 								sniff |= (1<<i);
 							}
 							break;
 						case ZC_PRE_P_SESSION:
-							if((mbuf->data[3] == ZC_PRE_P_PACKET) && (mbuf->data[4]&0xf0)!=1) {
+							if((mbuf->data[3] == ZC_PRE_P_PACKET) && (mbuf->data[4]&0xf)!=0xc) {
 								sniff |= (1<<i);
 							}
 						default:
@@ -254,7 +254,6 @@ static void mbuf_release_data(struct m_buf *mbuf)
 				}
 			}
 		}
-		//printk("sniffer %i result 0x%x\n", i, sniff);
 	}
 	sniff = !sniff? mbuf->sniff : sniff;
 	avl_free(mbuf->head, sniff, mbuf->len);
@@ -394,6 +393,7 @@ static void nta_test_func(unsigned long data)
 static int nta_counter_show(struct seq_file *seq, void *v)
 {
 	struct zc_control *ctl = &zc_sniffer[0];
+	int i;
 
 	seq_printf(seq, "Network Tree Zero Copy statistics:\n");
 	seq_printf(seq, "\tcounter[0]: alloc %lu free %lu hook %lu unhook %lu update %lu miss %lu cache %lu full %lu\n", 
@@ -405,10 +405,15 @@ static int nta_counter_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "\tcount_a: %lu count_b[0,1]: %lu %lu\n",
 			   count_a, count_b[0], count_b[1]);
 	seq_printf(seq, "Sniffer information:\n");
-	seq_printf(seq, "\tzc_num: %u zc_used %u zc_pos %u zc_max %u\n",
-			   ctl->zc_num, ctl->zc_used, ctl->zc_pos, ctl->zc_max);
 
-	seq_printf(seq, "\tcount_page %lu\n", count_page);
+	for(i=0; i<ZC_MAX_SNIFFERS; i++) {
+		ctl = &zc_sniffer[i];
+		seq_printf(seq, "\t%d: zc_num: %u zc_used %u zc_pos %u zc_max %u\n",
+				   i, ctl->zc_num, ctl->zc_used, ctl->zc_pos, ctl->zc_max);
+	}
+
+
+	seq_printf(seq, "\nMemory Configuration:\n\tcount_page %lu\n", count_page);
 	seq_printf(seq, "\tcount_node [%lu %lu]\tcount_mem[%lu %lu]\n", 
 			   count_node[0], count_node[1], count_mem[0], count_mem[1]);
 
@@ -495,7 +500,7 @@ nta_init_module(void)
 
 	nta_proc_init();
 
-#if 1
+#if 0
 	memcpy(&test_dev.name, "fuck", 4);
 	test_dev.name[4]=0;
 	nta_register_zc(&test_dev, test_hard_start_xmit);
