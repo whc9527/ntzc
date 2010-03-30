@@ -41,7 +41,7 @@
 #include <arpa/inet.h>
 
 #include <linux/types.h>
-#include <linux/if.h>
+#include <net/if.h>
 
 
 #include "control.h"
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
 	struct pollfd *pfd;
 	struct zc_user_control *ctl;
 
-	int my_sniifer_id = 0;
+	int my_sniifer_id = 1;
 
 
 	ctl_file = ifname = NULL;

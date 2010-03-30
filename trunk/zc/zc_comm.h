@@ -31,6 +31,12 @@ struct zc_ring
 	__u16 zc_used;
 };
 
+struct zc_ring_ctl{
+    __u16	zc_used, zc_pos;
+    __u16   zc_prev_used, zc_dummy;
+};
+
+
 /*
  * Zero-copy allocation request.
  * @type - type of the message - ipv4/ipv6/...
@@ -95,15 +101,15 @@ struct zc_sniff
 #define BVL_BITS		7	/* Must cover maximum number of pages used for allocation pools */
 
 #define ZC_MAX_NETDEVS		8
-#define ZC_MAX_SNIFFERS		4
+#define ZC_MAX_SNIFFERS		2
 
 #define DEFAULT_ZC_NUM	16384
-#define BVL_MAX_NODE_ENTRY_NUM	20
+#define BVL_MAX_NODE_ENTRY_NUM	40
 
-#define SNIFFER_RING_PAGES 1024
+#define SNIFFER_RING_PAGES (512-1)
 #define SNIFFER_RING_NODES	(SNIFFER_RING_PAGES*(PAGE_SIZE/sizeof(struct zc_data)/ZC_MAX_SNIFFERS))
 
-#define NTA_NR_CPUS			2
+#define NTA_NR_CPUS			1
 
 #endif /* _ZC_COMMON_H */
 

@@ -409,7 +409,7 @@ static int nta_counter_show(struct seq_file *seq, void *v)
 	for(i=0; i<ZC_MAX_SNIFFERS; i++) {
 		ctl = &zc_sniffer[i];
 		seq_printf(seq, "\t%d: zc_num: %u zc_used %u zc_pos %u zc_max %u\n",
-				   i, ctl->zc_num, ctl->zc_used, ctl->zc_pos, ctl->zc_max);
+				   i, ctl->zc_num, ctl->zcb_ring->zc_used, ctl->zcb_ring->zc_pos, ctl->zc_max);
 	}
 
 

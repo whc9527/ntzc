@@ -160,11 +160,12 @@ struct zc_control
 	struct net_device*	netdev[ZC_MAX_NETDEVS];
 	int		(*hard_start_xmit) (struct m_buf *mbuf,
 							struct net_device *dev);
-	struct zc_data		*zcb;
 	unsigned int		zc_num, zc_max;
-	__u16	zc_used, zc_pos;
+    struct zc_data		*zcb;
+    struct zc_ring_ctl  *zcb_ring;
 	spinlock_t		zc_lock;
 	wait_queue_head_t	zc_wait;
+    struct timer_list test_timer;
 };
 
 extern struct zc_control zc_sniffer[ZC_MAX_SNIFFERS];
