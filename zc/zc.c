@@ -183,7 +183,7 @@ static ssize_t zc_write(struct file *file, const char __user *buf, size_t size, 
 			used = 0;
 		}
 	}
-	ctl->zc_used = used;
+	ctl->zcb_ring->zc_used = used;
 	
 	return num;
 }
@@ -203,11 +203,11 @@ static ssize_t zc_read(struct file *file, char __user *buf, size_t size, loff_t 
 	}
 	wait_event_interruptible(ctl->zc_wait, ctl->zc_max != 0);
 
-	spin_lock_irqsave(&ctl->zc_lock, flags);
-	ring.zc_pos = ctl->zc_pos;
-	ring.zc_used = ctl->zc_used;
+	//spin_lock_irqsave(&ctl->zc_lock, flags);
+	ring.zc_pos = ctl->zcb_ring->zc_pos;
+	ring.zc_used = ctl->zcb_ring->zc_used;
 	ctl->zc_max = 0;
-	spin_unlock_irqrestore(&ctl->zc_lock, flags);
+	//spin_unlock_irqrestore(&ctl->zc_lock, flags);
 	if (copy_to_user(buf, &ring, sizeof(ring)))
 		sz = -EFAULT;
 	
@@ -231,6 +231,40 @@ static unsigned int zc_poll(struct file *file, struct poll_table_struct *wait)
 		poll_flags = POLLIN | POLLRDNORM;
 
 	return poll_flags;
+}
+
+static ssize_t zc_clear(struct zc_control *ctl)
+{
+	struct zc_ring ring;
+	struct zc_ring_ctl *zr = ctl->zcb_ring;
+	int i, num, used;
+
+	ring.zc_pos = zr->zc_prev_used;
+	ring.zc_used = zr->zc_used;
+
+	if (ring.zc_pos >= ring.zc_used)
+		num =  ring.zc_pos - ring.zc_used;
+	else
+		num =  ctl->zc_num - ring.zc_used + ring.zc_pos;
+
+	if(0 && num) {
+		printk("ctl %d num %d ctl->zc_used %d ctl->zc_dummy %d"
+			   "ctl->zc_pos %d ctl->zc_prev_used %d\n",
+			   ctl->sniffer->sniff_id,
+			   num , zr->zc_used , zr->zc_dummy, 
+			   zr->zc_pos, zr->zc_prev_used);
+	}
+	used = ring.zc_used;
+	for (i=0; i<num; ++i){
+		//printk("release zc at %d\n", used);
+		avl_free_no_zc(ctl->zcb[used++].data.ptr);
+		if(used == ctl->zc_num) {
+			used = 0;
+		}
+	}
+	ctl->zcb_ring->zc_used = used;
+	
+	return num;
 }
 
 static int zc_ctl_alloc(struct zc_alloc_ctl *ctl, void __user *arg)
@@ -588,6 +622,14 @@ static struct miscdevice zc_gen_dev =
 	.fops		= &zc_ops,
 };
 
+
+static void zc_clear_func(unsigned long data)
+{
+	struct zc_control *ctl = (struct zc_control *)data;
+	zc_clear(ctl);
+	mod_timer(&ctl->test_timer, jiffies+1);
+}
+
 int avl_init_zc(void)
 {
 	struct zc_control *ctl; //= &zc_sniffer;
@@ -606,11 +648,17 @@ int avl_init_zc(void)
 		ctl = &zc_sniffer[i];
 		memset(ctl, 0, sizeof(*ctl));
 		init_waitqueue_head(&ctl->zc_wait);
-		printk("wake up init ctl %p wait %p\n", ctl, &ctl->zc_wait);
-
 		spin_lock_init(&ctl->zc_lock);
 		ctl->zc_num = SNIFFER_RING_NODES/ZC_MAX_SNIFFERS;
-		ctl->zcb = (struct zc_data*)(avl_allocator[0].zc_ring_zone + i*ctl->zc_num*sizeof(struct zc_data)) ;
+		ctl->zcb = (struct zc_data*)(avl_allocator[0].zc_ring_zone + PAGE_SIZE + i*ctl->zc_num*sizeof(struct zc_data)) ;
+		ctl->zcb_ring = (struct zc_ring_ctl *)(avl_allocator[0].zc_ring_zone + i*sizeof(struct zc_ring_ctl));
+		printk("ctl %d zcb %p zcb_ring %p, ctl->zc_num %d\n", i, ctl->zcb, ctl->zcb_ring, ctl->zc_num);
+		ctl->zcb_ring->zc_pos = ctl->zcb_ring->zc_used 
+			= ctl->zcb_ring->zc_prev_used = ctl->zcb_ring->zc_dummy = 0;
+		ctl->test_timer.function = &zc_clear_func;
+		ctl->test_timer.data = (unsigned long)ctl;
+		init_timer(&ctl->test_timer);
+		mod_timer(&ctl->test_timer, jiffies+1);
 	}
 
 
@@ -619,5 +667,11 @@ int avl_init_zc(void)
 
 void avl_deinit_zc(void)
 {
+	int i;
+	struct zc_control *ctl;
+	for(i=0; i<ZC_MAX_SNIFFERS; i++) {
+		ctl = &zc_sniffer[i];
+		del_timer(&ctl->test_timer);
+	}
 	misc_deregister(&zc_gen_dev);
 }

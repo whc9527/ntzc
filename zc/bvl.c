@@ -156,10 +156,12 @@ void avl_fill_zc(struct zc_data *zc, void *ptr, int r_size)
 
 static inline int avl_zc_ring_unused(struct zc_control *zc)
 {
-	if (zc->zc_used > zc->zc_pos)
-		return zc->zc_used - zc->zc_pos - 1;
+    struct zc_ring_ctl *zr = zc->zcb_ring;
 
-	return zc->zc_num + zc->zc_used - zc->zc_pos - 1;
+    if (zr->zc_used > zr->zc_pos)
+		return zr->zc_used - zr->zc_pos - 1;
+
+	return zc->zc_num + zr->zc_used - zr->zc_pos - 1;
 }
 
 /*
@@ -173,15 +175,15 @@ static void avl_update_zc(struct avl_node *node, void *ptr, int r_size, int i)
 	unsigned long flags;
 	int pos;
 
-	spin_lock_irqsave(&ctl->zc_lock, flags);
+	//spin_lock_irqsave(&ctl->zc_lock, flags);
 	if(avl_zc_ring_unused(ctl)) {
-		pos = ctl->zc_pos;
+		pos = ctl->zcb_ring->zc_pos;
 	}else{
 		count_miss[i]++;
-		spin_unlock_irqrestore(&ctl->zc_lock, flags);
+		//spin_unlock_irqrestore(&ctl->zc_lock, flags);
 		return;
 	}
-	spin_unlock_irqrestore(&ctl->zc_lock, flags);
+	//spin_unlock_irqrestore(&ctl->zc_lock, flags);
 
 	do {
 		struct zc_data *zc = &ctl->zcb[pos];
@@ -204,7 +206,7 @@ static void avl_update_zc(struct avl_node *node, void *ptr, int r_size, int i)
 	}while(0);
 
 	spin_lock_irqsave(&ctl->zc_lock, flags);
-	ctl->zc_pos = pos;
+	ctl->zcb_ring->zc_pos = pos;
 	ctl->zc_max = 1;
 
 	spin_unlock_irqrestore(&ctl->zc_lock, flags);
