@@ -259,7 +259,7 @@ int zc_recv_loop(struct zc_user_control **zc_ctl,
 #endif
 #ifdef ZC_READ_WRITE
 			err = read(zc_ctl[j]->fd, &ring, sizeof(ring));
-			if (err <= 0) {
+			if (err < 0) {
 				fprintf(stderr, "Failed to read data from control file: %s [%d].\n", 
 						strerror(errno), errno);
 				return -2;

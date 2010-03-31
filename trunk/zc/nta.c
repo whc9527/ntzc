@@ -30,6 +30,8 @@
 #include <linux/list.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
+#include <linux/seq_file.h>
+#include <linux/proc_fs.h>
 #include <linux/poll.h>
 #include <linux/ioctl.h>
 #include <linux/ip.h>
@@ -179,8 +181,8 @@ struct m_buf *nta_alloc_mbuf(struct net_device *dev,
 		unsigned int length, gfp_t gfp_mask)
 {
 	struct m_buf *mbuf;
-
-	mbuf = __alloc_mbuf(length + NET_MBUF_PAD_ALLOC, gfp_mask);
+	
+	mbuf = __alloc_mbuf(length+NET_MBUF_PAD_ALLOC, gfp_mask);
 	if (likely(mbuf)) {
 		mbuf_reserve(mbuf, NET_MBUF_PAD_ALLOC);
 		mbuf->dev = dev;
@@ -280,62 +282,6 @@ void nta_kfree_mbuf(struct m_buf *mbuf)
 }
 
 
-int mbuf_dma_map(struct device *dev, struct m_buf *mbuf,
-		enum dma_data_direction dir)
-{
-	struct mbuf_shared_info *sp = mbuf_shinfo(mbuf);
-	dma_addr_t map;
-	int i;
-
-	map = dma_map_single(dev, mbuf->data,
-			     mbuf_headlen(mbuf), dir);
-	if (dma_mapping_error(dev, map))
-		goto out_err;
-
-	sp->dma_maps[0] = map;
-	for (i = 0; i < sp->nr_frags; i++) {
-		mbuf_frag_t *fp = &sp->frags[i];
-
-		map = dma_map_page(dev, fp->page, fp->page_offset,
-				   fp->size, dir);
-		if (dma_mapping_error(dev, map))
-			goto unwind;
-		sp->dma_maps[i + 1] = map;
-	}
-	sp->num_dma_maps = i + 1;
-
-	return 0;
-
-unwind:
-	while (--i >= 0) {
-		mbuf_frag_t *fp = &sp->frags[i];
-
-		dma_unmap_page(dev, sp->dma_maps[i + 1],
-			       fp->size, dir);
-	}
-	dma_unmap_single(dev, sp->dma_maps[0],
-			 mbuf_headlen(mbuf), dir);
-out_err:
-	return -ENOMEM;
-}
-EXPORT_SYMBOL(mbuf_dma_map);
-
-void mbuf_dma_unmap(struct device *dev, struct m_buf *mbuf,
-		   enum dma_data_direction dir)
-{
-	struct mbuf_shared_info *sp = mbuf_shinfo(mbuf);
-	int i;
-
-	dma_unmap_single(dev, sp->dma_maps[0],
-			 mbuf_headlen(mbuf), dir);
-	for (i = 0; i < sp->nr_frags; i++) {
-		mbuf_frag_t *fp = &sp->frags[i];
-
-		dma_unmap_page(dev, sp->dma_maps[i + 1],
-			       fp->size, dir);
-	}
-}
-EXPORT_SYMBOL(mbuf_dma_unmap);
 
 EXPORT_SYMBOL(nta_register_zc);
 

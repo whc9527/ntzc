@@ -114,7 +114,7 @@ struct m_buf {
 };
 
 /* To allow 64K frame to be packed as single mbuf without frag_list */
-#define MAX_MBUF_FRAGS (65536/PAGE_SIZE + 2)
+#define MAX_MBUF_FRAGS (2)
 
 typedef struct mbuf_frag_struct mbuf_frag_t;
 

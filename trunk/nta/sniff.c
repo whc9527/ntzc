@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
 	struct pollfd *pfd;
 	struct zc_user_control *ctl;
 
-	int my_sniifer_id = 1;
+	int my_sniifer_id = 0;
 
 
 	ctl_file = ifname = NULL;
@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
 	for (i=0; i<nr_cpus; ++i) {
 		struct zc_sniff zs;
 		zs.dev_index  = dev_index;
-		zs.pre_p = ZC_PRE_P_NPCP;
+		zs.pre_p = 0; //ZC_PRE_P_NPCP;
 		zs.pre_type = ZC_PRE_P_PACKET;
 		zs.sniff_mode = ZC_SNIFF_RX;
 		zs.sniff_id = my_sniifer_id;
@@ -222,6 +222,7 @@ int main(int argc, char *argv[])
 	/* no recv packet by the loop*/
 	while (!terminated) {
 		int i;
+		usleep(100);
 		i = zc_recv_loop(zc_ctl, nr_cpus, NULL, zc_analyze);
 		if(i<0) {
 			printf("Error in the zc recv loop %d\n", i);
