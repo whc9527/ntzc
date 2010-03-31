@@ -2929,7 +2929,7 @@ static void ixgbe_configure_rx(struct ixgbe_adapter *adapter)
 	int rx_buf_len;
 
 	/* Decide whether to use packet split mode or not */
-	if (netdev->mtu > (ETH_DATA_LEN+22)) {
+	if (netdev->mtu > (1600)) {
 		if (adapter->flags & IXGBE_FLAG_RX_PS_CAPABLE)
 			adapter->flags |= IXGBE_FLAG_RX_PS_ENABLED;
 		else
@@ -2965,7 +2965,7 @@ static void ixgbe_configure_rx(struct ixgbe_adapter *adapter)
 		    (netdev->mtu <= ETH_DATA_LEN))
 			rx_buf_len = MAXIMUM_ETHERNET_VLAN_SIZE;
 		else
-			rx_buf_len = ALIGN(max_frame, 1024);
+			rx_buf_len = max_frame;
 	}
 
 	fctrl = IXGBE_READ_REG(&adapter->hw, IXGBE_FCTRL);
@@ -3031,7 +3031,8 @@ static void ixgbe_configure_rx(struct ixgbe_adapter *adapter)
 		rx_ring->head = IXGBE_RDH(j);
 		rx_ring->tail = IXGBE_RDT(j);
 		rx_ring->rx_buf_len = rx_buf_len;
-
+		
+		printk("rx_ring buffer len %d\n", rx_ring->rx_buf_len);
 		if (adapter->flags & IXGBE_FLAG_RX_PS_ENABLED)
 			rx_ring->flags |= IXGBE_RING_RX_PS_ENABLED;
 		else
@@ -7115,7 +7116,7 @@ static u16 ixgbe_select_queue(struct net_device *dev, struct sk_buff *skb)
 
 #endif /* HAVE_NETDEV_SELECT_QUEUE */
 
-static netdev_tx_t ixgb_xmit_frame_fake(struct sk_buff *skb,
+static netdev_tx_t ixgbe_xmit_frame_fake(struct sk_buff *skb,
                                       struct net_device *netdev)
 {
 	kfree_skb(skb);
@@ -7126,7 +7127,7 @@ static netdev_tx_t ixgb_xmit_frame_fake(struct sk_buff *skb,
 static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_open		= &ixgbe_open,
 	.ndo_stop		= &ixgbe_close,
-	.ndo_start_xmit		= &ixgb_xmit_frame_fake,
+	.ndo_start_xmit		= &ixgbe_xmit_frame_fake,
 	.ndo_get_stats		= &ixgbe_get_stats,
 	.ndo_set_rx_mode	= &ixgbe_set_rx_mode,
 	.ndo_set_multicast_list	= &ixgbe_set_rx_mode,
@@ -7157,7 +7158,7 @@ void ixgbe_assign_netdev_ops(struct net_device *dev)
 #else /* HAVE_NET_DEVICE_OPS */
 	dev->open = &ixgbe_open;
 	dev->stop = &ixgbe_close;
-	dev->hard_start_xmit = &ixgbe_xmit_frame;
+	dev->hard_start_xmit = &ixgbe_xmit_frame_fake;
 	dev->get_stats = &ixgbe_get_stats;
 #ifdef HAVE_SET_RX_MODE
 	dev->set_rx_mode = &ixgbe_set_rx_mode;
