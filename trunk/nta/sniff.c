@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
 		zc_ctl_set_sniff(zc_ctl[i], &zs);
 		zc_ctl_enable_sniff(zc_ctl[i], 1, my_sniifer_id);
 	}
-	
+#if 0
 	/* no recv packet by the loop*/
 	while (!terminated) {
 		int i;
@@ -230,8 +230,20 @@ int main(int argc, char *argv[])
 		}
 		g_num_read += i;
 	}
+#endif
+	while (!terminated){
+		char *ptr;
+		struct zc_data *zc;
+		for(i=0; i<nr_cpus; ++i) {
+			if((ptr = zc_get(zc_ctl[i], &zc))){
+				zc_analyze(ptr, zc->r_size, NULL);
+				zc_put(zc_ctl[i]);
+			}else
+				usleep(10);
+		}
+	}
 
-	for(i=0; i<nr_cpus; i++) {
+	for (i=0; i<nr_cpus; ++i) {
 		zc_ctl_enable_sniff(zc_ctl[i], 0, my_sniifer_id);
 	}
 	

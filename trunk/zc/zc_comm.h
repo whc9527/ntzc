@@ -32,8 +32,8 @@ struct zc_ring
 };
 
 struct zc_ring_ctl{
-    __u16	zc_used, zc_pos;
-    __u16   zc_prev_used, zc_dummy;
+    __u16	zc_used /* eraser */, zc_pos /* producer */;
+    __u16   zc_prev_used, zc_dummy /* consumer */;
 };
 
 

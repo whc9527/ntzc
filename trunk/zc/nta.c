@@ -318,7 +318,7 @@ static void nta_test_func(unsigned long data)
 	struct sig *sig;
 	struct m_buf *mbuf;
 
-	for(i=0; i<4096;i++) {
+	for(i=0; i<8192;i++) {
 		mbuf = nta_alloc_mbuf(NULL, 1522, GFP_ATOMIC);
 		if(!mbuf) {
 			continue;
@@ -446,7 +446,7 @@ nta_init_module(void)
 
 	nta_proc_init();
 
-#if 0
+#if 1
 	memcpy(&test_dev.name, "fuck", 4);
 	test_dev.name[4]=0;
 	nta_register_zc(&test_dev, test_hard_start_xmit);

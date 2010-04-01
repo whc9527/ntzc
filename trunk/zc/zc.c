@@ -108,7 +108,7 @@ static int zc_mmap(struct file *file, struct vm_area_struct *vma)
 #endif
 			continue;
 		}
-		num = min_t(unsigned int, total_num, e->avl_node_num*(1<<e->avl_node_order));
+		num = min_t(unsigned int, total_num, e->avl_node_num*(1<<BVL_ORDER));
 
 		//printk("%s: cpu: %d, e: %p, total_num: %u, node_num: %u, node_order: %u, st: %u, num: %u.\n",
 		//		__func__, priv->cpu, e, total_num, e->avl_node_num, e->avl_node_order, st, num);
@@ -125,7 +125,7 @@ static int zc_mmap(struct file *file, struct vm_area_struct *vma)
 				off = 0;
 			}
 
-			for (j=0; (j<(1<<e->avl_node_order)) && (i<num); ++j, ++i) {
+			for (j=0; (j<(1<<BVL_ORDER)) && (i<num); ++j, ++i) {
 				unsigned long virt = node->value + (j<<PAGE_SHIFT);
 				page_count++;
 				err = vm_insert_page(vma, start, virt_to_page(virt));
@@ -239,7 +239,8 @@ static ssize_t zc_clear(struct zc_control *ctl)
 	struct zc_ring_ctl *zr = ctl->zcb_ring;
 	int i, num, used;
 
-	ring.zc_pos = zr->zc_prev_used;
+	//ring.zc_pos = zr->zc_prev_used;
+	ring.zc_pos = zr->zc_dummy;
 	ring.zc_used = zr->zc_used;
 
 	if (ring.zc_pos >= ring.zc_used)
@@ -433,7 +434,7 @@ struct zc_status *zc_get_status(int cpu, unsigned int start)
 		if (e->avl_entry_num >= start && num < ZC_MAX_ENTRY_NUM) {
 			es = &st->entry[num];
 
-			es->node_order = e->avl_node_order;
+			es->node_order = BVL_ORDER;
 			es->node_num = e->avl_node_num;
 			num++;
 		}
