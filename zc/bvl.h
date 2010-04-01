@@ -87,8 +87,8 @@ struct avl_node_entry
 	struct avl_node 	**avl_node_array;
 	struct list_head	node_entry;
 	u32		avl_entry_num;
-	u16 	avl_node_order, avl_node_num;
-	u16		avl_node_pages;
+	u16 	avl_node_num, avl_node_pages;
+	//u16		avl_node_pages;
 };
 
 

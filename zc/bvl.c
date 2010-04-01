@@ -125,7 +125,8 @@ static void __avl_fill_zc(struct zc_data *zc, void *ptr, struct avl_node *node, 
 	u32 off;
 
 	//off = ((unsigned long)node & ~PAGE_MASK)/sizeof(struct avl_node)*((1U<<node->entry->avl_node_order)<<PAGE_SHIFT);
-	off = ((unsigned long)node - (unsigned long)(node->entry->avl_node_array[0]))/sizeof(struct avl_node)*((1U<<node->entry->avl_node_order)<<PAGE_SHIFT);
+	off = ((unsigned long)node - (unsigned long)(node->entry->avl_node_array[0]))/
+		sizeof(struct avl_node)*((1U<<BVL_ORDER)<<PAGE_SHIFT);
 	zc->off = off+avl_ptr_to_offset(ptr)*BVL_CELL_SIZE;
 	//printk("off %d avl_ptr_to_offset(ptr) %d ptr %p node %p sizeof(struct avl_node) %d node->entry->avl_node_order %d value %p\n", 
 	//	   off, avl_ptr_to_offset(ptr), ptr, node, sizeof(struct avl_node), node->entry->avl_node_order, node->value);
@@ -188,9 +189,6 @@ static void avl_update_zc(struct avl_node *node, void *ptr, int r_size, int i)
 	do {
 		struct zc_data *zc = &ctl->zcb[pos];
 		struct avl_chunk *ch = avl_ptr_to_chunk(ptr);;
-
-		//printk("fill at pos %d\n", pos);
-
 		atomic_inc(&ch->refcnt);
 		count_update[i]++;
 		__avl_fill_zc(zc, ptr, node, r_size);
@@ -239,8 +237,6 @@ static void __avl_free(void *ptr)
 void avl_free_no_zc(void *ptr)
 {
 	unsigned long flags;
-	//struct avl_free_list *l;
-	//struct avl_allocator_data *alloc;
 	struct avl_chunk *ch = avl_ptr_to_chunk(ptr);
 
 	if (unlikely((ch->canary != BVL_CANARY))) {
@@ -262,8 +258,10 @@ void avl_free_no_zc(void *ptr)
  */
 void avl_free(void *ptr, int sniff, int r_size)
 {
-	struct avl_chunk *ch = avl_ptr_to_chunk(ptr);
 	int i;
+
+#if 0
+	struct avl_chunk *ch = avl_ptr_to_chunk(ptr);
 
 	if (unlikely((ch->canary != BVL_CANARY))) {
 		printk("Freeing destroyed object: ptr: %p, ch: %p, canary: %x, must be %x, refcnt: %d, saved size: %u.\n",
@@ -271,7 +269,7 @@ void avl_free(void *ptr, int sniff, int r_size)
         //WARN_ON("avl_free");
         return;
 	}
-
+#endif
 	for(i=0; i< ZC_MAX_SNIFFERS; i++){
 		if(sniff & (1<<i)) {
 			avl_update_zc(avl_get_node_ptr((unsigned long)ptr), ptr, r_size, i);
@@ -320,7 +318,7 @@ static void avl_scan(int cpu)
 				off = 0;
 			}
 			//printk("scan node %d @ %lx for entry %d:\n", i, node->value, e->avl_entry_num);
-			for (j=0; j<((1<<e->avl_node_order)*(PAGE_SIZE/size)); j++) {
+			for (j=0; j<((1<<BVL_ORDER)*(PAGE_SIZE/size)); j++) {
 				struct avl_chunk *ch;
 				unsigned long virt = node->value + (j*size);
 				struct avl_free_list *this = (struct avl_free_list *) virt;
@@ -409,8 +407,8 @@ static void avl_node_entry_commit(struct avl_node_entry *entry, int cpu)
 #if 1
 		node->entry = entry;
 #endif
-		avl_set_cpu_ptr(node->value, cpu, entry->avl_node_order);
-		avl_set_node_ptr(node->value, node, entry->avl_node_order);
+		avl_set_cpu_ptr(node->value, cpu, BVL_ORDER);
+		avl_set_node_ptr(node->value, node, BVL_ORDER);
 		count_node[cpu]++;
 	}
 
@@ -421,20 +419,21 @@ static void avl_node_entry_commit(struct avl_node_entry *entry, int cpu)
 	spin_unlock(&avl_allocator[cpu].avl_node_lock);
 
 	printk("Network allocator cache has grown: entry: %u, number: %u, order: %u.\n",
-			entry->avl_entry_num, entry->avl_node_num, entry->avl_node_order);
+			entry->avl_entry_num, entry->avl_node_num, BVL_ORDER);
 }
 
 /*
  * Simple cache growing function - allocate as much as possible,
  * but no more than @BVL_NODE_NUM pages when there is a need for that.
  */
-static struct avl_node_entry *avl_node_entry_alloc(gfp_t gfp_mask, int order)
+static struct avl_node_entry *avl_node_entry_alloc(gfp_t gfp_mask)
 {
 	struct avl_node_entry *entry;
 	int i, num = 0, idx, off, j;
 	unsigned long ptr;
 	unsigned long tmp;
 	int otmp;
+	int order = BVL_ORDER;
 
 	entry = kzalloc(sizeof(struct avl_node_entry), gfp_mask);
 	if (!entry)
@@ -511,7 +510,6 @@ static struct avl_node_entry *avl_node_entry_alloc(gfp_t gfp_mask, int order)
 		goto err_out_free;
 
 	entry->avl_node_num = i;
-	entry->avl_node_order = order;
 
 	return entry;
 
@@ -543,7 +541,7 @@ static int avl_init_cpu(int cpu)
 		num = BVL_MAX_NODE_ENTRY_NUM;
 	for (i=0; i<num; i++)
 	{
-		entry = avl_node_entry_alloc(GFP_KERNEL, BVL_ORDER);
+		entry = avl_node_entry_alloc(GFP_KERNEL);
 		if (!entry)
 			goto err_out_exit;
 

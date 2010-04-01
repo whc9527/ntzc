@@ -59,13 +59,8 @@ struct zc_pool{
 	struct zc_ring ring_rec[NTA_NR_CPUS];
 };
 
-int zc_save_into_pool(struct zc_user_control **zc_ctl, 
-				 unsigned int nr_cpus,
-				 struct zc_pool *pool);
-
-int zc_release_pool(struct zc_user_control **zc_ctl, 
-				 unsigned int nr_cpus,
-				 struct zc_pool *pool);
+inline char * zc_get(struct zc_user_control *ctl, struct zc_data **z);
+inline void zc_put(struct zc_user_control *ctl);
 
 int zc_ctl_enable_sniff(struct zc_user_control *zc, int enable, int id);
 

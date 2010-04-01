@@ -2806,7 +2806,7 @@ bnx2_rx_int(struct bnx2 *bp, struct bnx2_napi *bnapi, int budget)
 				bnx2_reuse_rx_mbuf(bp, bnapi, mbuf, sw_ring_cons,
 						  sw_ring_prod);
 				goto next_rx;
-			}
+			} 
 
 			/* aligned copy */
 			mbuf_copy_from_linear_data_offset(mbuf, bp->rx_offset - 2,

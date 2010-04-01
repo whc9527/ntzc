@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-c -g -I ..
+CFLAGS=-O2 -c -g -I ..
 LDFLAGS=-g 
 SOURCES=send.c sniff.c control.c
 OBJECTS_SNIFF = sniff.o control.o
