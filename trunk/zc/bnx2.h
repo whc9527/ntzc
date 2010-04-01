@@ -1,6 +1,6 @@
 /* bnx2.h: Broadcom NX2 network driver.
  *
- * Copyright (c) 2004-2009 Broadcom Corporation
+ * Copyright (c) 2004-2007 Broadcom Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -12,921 +12,6 @@
 
 #ifndef BNX2_H
 #define BNX2_H
-
-#if (LINUX_VERSION_CODE >= 0x020610)
-#define BCM_CNIC 1
-#endif
-
-#if defined(__VMKLNX__) && (VMWARE_ESX_DDK_VERSION >= 41000)
-#define VMWARE_ISCSI
-#endif
-
-#if defined(__VMKLNX__) && \
-    (VMWARE_ESX_DDK_VERSION >= 40000)
-#define BNX2_VMWARE_BMAPILNX
-#endif
-
-#if defined(__VMKLNX__)
-#define HAVE_LE32	1
-#define HAVE_IP_HDR	1
-#define NEW_SKB		1
-#define BNX2_NEW_NAPI	1
-#endif
-
-
-#define HAVE_LE32	1
-
-
-#ifndef ADVERTISE_1000XFULL
-#define ADVERTISE_1000XFULL	0x0020
-#define ADVERTISE_1000XHALF	0x0040
-#define ADVERTISE_1000XPAUSE	0x0080
-#define ADVERTISE_1000XPSE_ASYM	0x0100
-#endif
-
-#ifndef ADVERTISE_PAUSE_CAP
-#define ADVERTISE_PAUSE_CAP	0x0400
-#define ADVERTISE_PAUSE_ASYM	0x0800
-#endif
-
-#ifndef MII_CTRL1000
-#define MII_CTRL1000		0x9
-#define MII_STAT1000		0xa
-#endif
-
-#ifndef BMCR_SPEED1000
-#define BMCR_SPEED1000		0x0040
-#endif
-
-#ifndef ADVERTISE_1000FULL
-#define ADVERTISE_1000FULL	0x0200
-#define ADVERTISE_1000HALF	0x0100
-#endif
-
-#ifndef SPEED_2500
-#define SPEED_2500		2500
-#endif
-
-#ifndef SUPPORTED_2500baseX_Full
-#define SUPPORTED_2500baseX_Full	(1 << 15)
-#define ADVERTISED_2500baseX_Full	(1 << 15)
-#endif
-
-#ifndef ETH_FCS_LEN
-#define ETH_FCS_LEN	4
-#endif
-
-#ifndef PCI_DEVICE_ID_NX2_5706
-#define PCI_DEVICE_ID_NX2_5706	0x164a
-#define PCI_DEVICE_ID_NX2_5706S	0x16aa
-#endif
-
-#ifndef PCI_DEVICE_ID_NX2_5708
-#define PCI_DEVICE_ID_NX2_5708	0x164c
-#define PCI_DEVICE_ID_NX2_5708S	0x16ac
-#endif
-
-#ifndef PCI_DEVICE_ID_NX2_5709
-#define PCI_DEVICE_ID_NX2_5709	0x1639
-#endif
-
-#ifndef PCI_DEVICE_ID_NX2_5709S
-#define PCI_DEVICE_ID_NX2_5709S	0x163a
-#endif
-
-#ifndef PCI_DEVICE_ID_AMD_8132_BRIDGE
-#define PCI_DEVICE_ID_AMD_8132_BRIDGE	0x7458
-#endif
-
-#ifndef IRQ_RETVAL
-typedef void irqreturn_t;
-#define IRQ_RETVAL(x)
-#define IRQ_HANDLED
-#define IRQ_NONE
-#endif
-
-#ifndef IRQF_SHARED
-#define IRQF_SHARED SA_SHIRQ
-#endif
-
-#ifndef NETDEV_TX_OK
-#define NETDEV_TX_OK 0
-#endif
-
-#ifndef NETDEV_TX_BUSY
-#define NETDEV_TX_BUSY 1
-#endif
-
-#if (LINUX_VERSION_CODE < 0x020620)
-typedef int netdev_tx_t;
-#endif
-
-#if (LINUX_VERSION_CODE < 0x020547)
-#define pci_set_consistent_dma_mask(pdev, mask) (0)
-#endif
-
-#ifndef PCI_CAP_ID_EXP
-#define PCI_CAP_ID_EXP 0x10
-#endif
-
-#ifndef DEFINE_PCI_DEVICE_TABLE
-#define DEFINE_PCI_DEVICE_TABLE(_table) \
-	struct pci_device_id _table[]
-#endif
-
-#if (LINUX_VERSION_CODE < 0x020604)
-#define MODULE_VERSION(version)
-#endif
-
-#ifndef SET_MODULE_OWNER
-#define SET_MODULE_OWNER(dev) do { } while (0)
-#endif
-
-#ifndef CHECKSUM_PARTIAL
-#define CHECKSUM_PARTIAL CHECKSUM_HW
-#endif
-
-#ifndef DMA_BIT_MASK
-#define DMA_BIT_MASK(n)	(((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
-#endif
-
-#ifndef mmiowb
-#define mmiowb()
-#endif
-
-#if !defined(__iomem)
-#define __iomem
-#endif
-
-#if !defined(__rcquires)
-#define __acquires(x)
-#define __releases(x)
-#endif
-
-#ifndef HAVE_LE32
-typedef u32 __le32;
-typedef u32 __be32;
-#endif
-
-#ifndef USEC_PER_SEC
-#define USEC_PER_SEC	1000000L
-#endif
-
-#ifndef __maybe_unused
-#define __maybe_unused
-#endif
-
-#if (LINUX_VERSION_CODE < 0x2060b)
-typedef u32 pm_message_t;
-typedef u32 pci_power_t;
-#define PCI_D0		0
-#define PCI_D3hot	3
-#endif
-
-#if (LINUX_VERSION_CODE < 0x020605)
-#define pci_dma_sync_single_for_cpu(pdev, map, len, dir)	\
-	pci_dma_sync_single(pdev, map, len, dir)
-
-#define pci_dma_sync_single_for_device(pdev, map, len, dir)
-#endif
-
-#if (LINUX_VERSION_CODE < 0x020612)
-static inline struct m_buf *netdev_alloc_mbuf(struct net_device *dev,
-		unsigned int length)
-{
-	struct m_buf *mbuf = dev_alloc_mbuf(length);
-	if (mbuf)
-		mbuf->dev = dev;
-	return mbuf;
-}
-#endif
-
-#if 0
-static inline void bnx2_mbuf_fill_page_desc(struct m_buf *mbuf, int i,
-					   struct page *page, int off, int size)
-{
-#if (LINUX_VERSION_CODE < 0x020600)
-	mbuf_frag_t *frag = &mbuf_shinfo(mbuf)->frags[i];
-
-	frag->page		  = page;
-	frag->page_offset	  = off;
-	frag->size		  = size;
-	mbuf_shinfo(mbuf)->nr_frags = i + 1;
-#else
-	skb_fill_page_desc(mbuf, i, page, off, size);
-#endif
-}
-#endif
-#if 0
-#ifndef NETIF_F_GSO
-static inline void netif_tx_lock(struct net_device *dev)
-{
-	spin_lock(&dev->xmit_lock);
-	dev->xmit_lock_owner = smp_processor_id();
-}
-
-static inline void netif_tx_unlock(struct net_device *dev)
-{
-	dev->xmit_lock_owner = -1;
-	spin_unlock(&dev->xmit_lock);
-}
-#endif
-#endif
-
-#if !defined(HAVE_NETDEV_PRIV) && (LINUX_VERSION_CODE != 0x020603) && (LINUX_VERSION_CODE != 0x020604) && (LINUX_VERSION_CODE != 0x20605)
-static inline void *netdev_priv(struct net_device *dev)
-{
-	return dev->priv;
-}
-#endif
-
-#ifdef OLD_NETIF
-static inline void netif_poll_disable(struct net_device *dev)
-{
-	while (test_and_set_bit(__LINK_STATE_RX_SCHED, &dev->state)) {
-		/* No hurry. */
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(1);
-	}
-}
-
-static inline void netif_poll_enable(struct net_device *dev)
-{
-	clear_bit(__LINK_STATE_RX_SCHED, &dev->state);
-}
-
-static inline void netif_tx_disable(struct net_device *dev)
-{
-	spin_lock_bh(&dev->xmit_lock);
-	netif_stop_queue(dev);
-	spin_unlock_bh(&dev->xmit_lock);
-}
-
-#endif
-
-#if (LINUX_VERSION_CODE >= 0x20418) && (LINUX_VERSION_CODE < 0x2060c)
-static inline int bnx2_set_tx_hw_csum(struct net_device *dev, u32 data)
-{
-	if (data)
-		dev->features |= NETIF_F_HW_CSUM;
-	else
-		dev->features &= ~NETIF_F_HW_CSUM;
-
-	return 0;
-}
-#endif
-
-#ifndef VLAN_GROUP_ARRAY_SPLIT_PARTS
-static inline void vlan_group_set_device(struct vlan_group *vg, int vlan_id,
-					 struct net_device *dev)
-{
-	if (vg)
-		vg->vlan_devices[vlan_id] = dev;
-}
-#endif
-
-#ifdef NETIF_F_TSO
-#ifndef NETIF_F_GSO
-static inline int mbuf_is_gso(const struct m_buf *mbuf)
-{
-	return mbuf_shinfo(mbuf)->tso_size;
-}
-#define gso_size tso_size
-#define gso_segs tso_segs
-#endif
-#ifndef NETIF_F_TSO6
-#define NETIF_F_TSO6	0
-#define BCM_NO_TSO6	1
-#endif
-#ifndef NETIF_F_TSO_ECN
-#define NETIF_F_TSO_ECN	0
-#endif
-
-
-#ifndef HAVE_IP_HDR
-static inline struct iphdr *ip_hdr(const struct m_buf *mbuf)
-{
-	return mbuf->nh.iph;
-}
-#endif
-
-#ifndef NEW_SKB
-static inline int mbuf_transport_offset(const struct m_buf *mbuf)
-{
-	return (int) (mbuf->h.raw - mbuf->data);
-}
-
-static inline unsigned int ip_hdrlen(const struct m_buf *mbuf)
-{
-	return ip_hdr(mbuf)->ihl * 4;
-}
-
-static inline struct tcphdr *tcp_hdr(const struct m_buf *mbuf)
-{
-	return mbuf->h.th;
-}
-
-static inline unsigned int tcp_optlen(const struct m_buf *mbuf)
-{
-	return (tcp_hdr(mbuf)->doff - 5) * 4;
-}
-
-#endif
-#endif /* #ifdef NETIF_F_TSO */
-
-#ifndef VMWARE_ESX_40_DDK
-#if ((LINUX_VERSION_CODE >= 0x20617) && !defined(NETIF_F_MULTI_QUEUE)) || defined(__VMKLNX__)
-
-#define BCM_HAVE_MULTI_QUEUE
-
-#else
-
-static inline void netif_tx_wake_all_queues(struct net_device *dev)
-{
-	netif_wake_queue(dev);
-}
-
-static inline void netif_tx_start_all_queues(struct net_device *dev)
-{
-	netif_start_queue(dev);
-}
-
-#endif
-#else
-#define BCM_HAVE_MULTI_QUEUE
-#endif
-
- 
-#ifndef NET_SKB_PAD
-#define NET_SKB_PAD	16
-#endif
-
-#if (LINUX_VERSION_CODE < 0x02061e)
-static inline void mbuf_record_rx_queue(struct m_buf *mbuf, u16 rx_queue)
-{
-}
-#endif
-
-#if (defined(HAVE_SET_RX_MODE) && (LINUX_VERSION_CODE >= 0x02061f))
-#define BCM_HAVE_SET_RX_MODE	1
-#endif
-
-#if (LINUX_VERSION_CODE < 0x020600)
-#define dev_err(unused, format, arg...)		\
-	printk(KERN_ERR "bnx2: " format , ## arg)
-#else
-#ifndef dev_err
-#ifndef dev_printk
-#define dev_printk(level, dev, format, arg...)	\
-	printk(level "bnx2 %s: " format , (dev)->bus_id , ## arg)
-#endif
-#define dev_err(dev, format, arg...)		\
-	dev_printk(KERN_ERR , dev , format , ## arg)
-#endif
-#endif
-
-#if !defined(DECLARE_MAC_BUF) || (LINUX_VERSION_CODE >= 0x020621)
-#ifndef MAC_FMT
-#define MAC_FMT "%02x:%02x:%02x:%02x:%02x:%02x"
-#endif
-
-static inline char *print_mac(char *buf, const u8 *addr)
-{
-	sprintf(buf, MAC_FMT,
-		addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
-	return buf;
-}
-#endif
-
-#ifndef DECLARE_MAC_BUF
-#define DECLARE_MAC_BUF(var) char var[18]
-#endif
-
-
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-#endif
-
-#if (LINUX_VERSION_CODE >= 0x020618)
-#define BNX2_NEW_NAPI	1
-#endif
-
-static inline void bnx2_msleep(unsigned int msecs)
-{
-#if (LINUX_VERSION_CODE < 0x20607)
-	current->state = TASK_UNINTERRUPTIBLE;
-	schedule_timeout((msecs * HZ / 1000) + 1);
-#else
-	msleep(msecs);
-#endif
-}
-
-static inline unsigned long bnx2_msleep_interruptible(unsigned int msecs)
-{
-#if (LINUX_VERSION_CODE < 0x20609)
-	current->state = TASK_INTERRUPTIBLE;
-	return schedule_timeout((msecs * HZ / 1000) + 1);
-#else
-	return msleep_interruptible(msecs);
-#endif
-}
-
-#if 0
-#ifndef HAVE_BOOL
-typedef int bool;
-#define false 0
-#define true  1
-#endif
-#endif
-
-#if defined (__VMKLNX__)
-/**
- * THIS FUNCTION SHOULD BE REMOVED ONCE PR 379263 IS RESOLVED
- */
-static void *bcm_memmove(void *dest, const void *src, size_t count)
-{
-	char *tmp;
-	const char *s;
-
-	if (dest <= src) {
-		tmp = dest;
-		s = src;
-		while (count--)
-			*tmp++ = *s++;
-	} else {
-		tmp = dest;
-		tmp += count;
-		s = src;
-		s += count;
-		while (count--)
-			*--tmp = *--s;
-	}
-	return dest;
-}
-#else /* !defined (__VMKLNX__) */
-#define bcm_memmove	memmove
-#endif /* defined (__VMKLNX__) */
-
-#if defined(__VMKLNX__) && defined(__VMKNETDDI_QUEUEOPS__)
-
-#define QID_TO_PM_OFFSET	4
-
-/* u32 fw_doorbell_ready */
-#define KWQ_READY  (1<<0)
-#define KWQ1_READY (1<<1)
-#define KWQ2_READY (1<<2)
-#define KWQ3_READY (1<<3)
-
-#define KCQ_READY  (1<<0)
-#define KCQ1_READY (1<<1)
-#define KCQ2_READY (1<<2)
-#define KCQ3_READY (1<<3)
-
-typedef u16 l2_kcqe_errors_t;
-	#define L2_KCQE_ERRORS_BAD_CRC                      (1<<1)
-	#define L2_KCQE_ERRORS_PHY_DECODE                   (1<<2)
-	#define L2_KCQE_ERRORS_ALIGNMENT                    (1<<3)
-	#define L2_KCQE_ERRORS_TOO_SHORT                    (1<<4)
-	#define L2_KCQE_ERRORS_GIANT_FRAME                  (1<<5)
-
-typedef u16 l2_kcqe_status_t;
-	#define L2_KCQE_STATUS_RULE_CLASS                   (0x7<<0)
-	#define L2_KCQE_STATUS_RULE_P2                      (1<<3)
-	#define L2_KCQE_STATUS_RULE_P3                      (1<<4)
-	#define L2_KCQE_STATUS_RULE_P4                      (1<<5)
-	#define L2_KCQE_STATUS_L2_VLAN_TAG                  (1<<6)
-	#define L2_KCQE_STATUS_L2_LLC_SNAP                  (1<<7)
-	#define L2_KCQE_STATUS_L2_HASH                      (0x1f<<8)
-	#define L2_KCQE_STATUS_IP_DATAGRAM                  (1<<13)
-	#define L2_KCQE_STATUS_TCP_SEGMENT                  (1<<14)
-	#define L2_KCQE_STATUS_UDP_DATAGRAM                 (1<<15)
-
-typedef u8 l2_kcqe_opcode_t;
-	#define L2_KCQE_OPCODE_VALUE                        (0xff<<0)
-	#define L2_KCQE_OPCODE_VALUE_RX_PACKET              (0<<0)
-	#define L2_KCQE_OPCODE_VALUE_ENABLE_RSS             (1<<0)
-	#define L2_KCQE_OPCODE_VALUE_DISABLE_RSS            (2<<0)
-	#define L2_KCQE_OPCODE_VALUE_UPDATE_RSS             (3<<0)
-	#define L2_KCQE_OPCODE_VALUE_FLUSH_BD_CHAIN         (4<<0)
-	#define L2_KCQE_OPCODE_VALUE_DEBUG                  (5<<0)
-	#define L2_KCQE_OPCODE_VALUE_VM_ALLOC_TX_QUEUE      (6<<0)
-	#define L2_KCQE_OPCODE_VALUE_VM_FREE_TX_QUEUE       (7<<0)
-	#define L2_KCQE_OPCODE_VALUE_VM_ALLOC_RX_QUEUE      (8<<0)
-	#define L2_KCQE_OPCODE_VALUE_VM_FREE_RX_QUEUE       (9<<0)
-	#define L2_KCQE_OPCODE_VALUE_VM_SET_RX_FILTER       (10<<0)
-	#define L2_KCQE_OPCODE_VALUE_VM_REMOVE_RX_FILTER    (11<<0)
-
-typedef u8 l2_kcqe_flags_t;
-	#define L2_KCQE_FLAGS_LAYER_MASK                    (0x7<<4)
-	#define L2_KCQE_FLAGS_LAYER_MASK_MISC               (0<<4)
-	#define L2_KCQE_FLAGS_LAYER_MASK_L2                 (2<<4)
-	#define L2_KCQE_FLAGS_LAYER_MASK_L3                 (3<<4)
-	#define L2_KCQE_FLAGS_LAYER_MASK_L4                 (4<<4)
-	#define L2_KCQE_FLAGS_LAYER_MASK_L5                 (5<<4)
-	#define L2_KCQE_FLAGS_NEXT                          (1<<7)
-
-/*
- *  l2_kcqe_l definition
- */
-#if defined(__BIG_ENDIAN)
-struct l2_kcqe {
-    u8			qid;
-    u8			status;
-    u16			reserved;
-    u32			reserved1[6];
-
-    l2_kcqe_flags_t	flags;
-    l2_kcqe_opcode_t	opcode;
-    u16			qe_self_seq;
-};
-#elif defined(__LITTLE_ENDIAN)
-struct l2_kcqe {
-    u8			qid;
-    u8			status;
-    u16			reserved;
-    u32			reserved1[6];
-
-    u16			qe_self_seq;
-    l2_kcqe_opcode_t	opcode;
-    l2_kcqe_flags_t	flags;
-};
-#endif
-
-/*
- *  l2_kcqe_vm_alloc_tx_queue definition
- */
-#if defined(BIG_ENDIAN)
-struct l2_kcqe_vm_alloc_tx_queue {
-	u8			qid;
-	u8			status;
-	u16			reserved;
-	u32			reserved1[5];
-
-	l2_kcqe_flags_t	flags;
-	l2_kcqe_opcode_t	opcode;
-	u16			qe_self_seq;
-};
-#elif defined(LITTLE_ENDIAN)
-struct l2_kcqe_vm_alloc_tx_queue {
-	u16			reserved;
-	u8			status;
-	u8			qid;
-	u32			reserved1[5];
-
-	u16			qe_self_seq;
-	l2_kcqe_opcode_t	opcode;
-	l2_kcqe_flags_t	flags;
-};
-#endif
-
-/*
- *  l2_kcqe_vm_free_tx_queue definition
- */
-#if defined(BIG_ENDIAN)
-struct l2_kcqe_vm_free_tx_queue {
-	u8			qid;
-	u8			status;
-	u16			nx_bidx;
-	u32			reserved1[5];
-
-	l2_kcqe_flags_t		flags;
-	l2_kcqe_opcode_t	opcode;
-	u16			qe_self_seq;
-};
-#elif defined(LITTLE_ENDIAN)
-struct l2_kcqe_vm_free_tx_queue {
-	u16			nx_bidx;
-	u8			status;
-	u8			qid;
-	u32			reserved1[5];
-
-	u16			qe_self_seq;
-	l2_kcqe_opcode_t	opcode;
-	l2_kcqe_flags_t		flags;
-};
-#endif
-
-/*
- *  l2_kcqe_vm_alloc_rx_queue definition
- */
-#if defined(BIG_ENDIAN)
-struct l2_kcqe_vm_alloc_rx_queue_b {
-	u8			qid;
-	u8			status;
-	u16			reserved;
-	u32			reserved1[5];
-
-	l2_kcqe_flags_t	flags;
-	l2_kcqe_opcode_t	opcode;
-	u16			qe_self_seq;
-};
-#elif defined(LITTLE_ENDIAN)
-struct l2_kcqe_vm_alloc_rx_queue_l {
-	u16			reserved;
-	u8			status;
-	u8			qid;
-	u32			reserved1[5];
-
-	u16			qe_self_seq;
-	l2_kcqe_opcode_t	opcode;
-	l2_kcqe_flags_t	flags;
-};
-#endif
-
-/*
- *  l2_kcqe_vm_free_rx_queue definition
- */
-#if defined(BIG_ENDIAN)
-struct l2_kcqe_vm_free_rx_queue {
-	u8			qid;
-	u8			status;
-	u16			nx_bidx;
-	u32			reserved1[5];
-
-	l2_kcqe_flags_t	flags;
-	l2_kcqe_opcode_t	opcode;
-	u16			qe_self_seq;
-};
-#elif defined(LITTLE_ENDIAN)
-struct l2_kcqe_vm_free_rx_queue {
-	u16			nx_bidx;
-	u8			status;
-	u8			qid;
-	u32			reserved1[5];
-
-	u16			qe_self_seq;
-	l2_kcqe_opcode_t	opcode;
-	l2_kcqe_flags_t		flags;
-};
-#endif
-
-/*
- *  l2_kcqe_vm_set_rx_filter definition
- */
-#if defined(BIG_ENDIAN)
-struct l2_kcqe_vm_set_rx_filter {
-    u8			qid;
-    u8			status;
-    u16			reserved1;
-    u32			reserved2[5];
-
-    l2_kcqe_flags_t	flags;
-    l2_kcqe_opcode_t	opcode;
-    u16			qe_self_seq;
-};
-#elif defined(LITTLE_ENDIAN)
-struct l2_kcqe_vm_set_rx_filter {
-    u16			reserved1;
-    u8			status;
-    u8			qid;
-    u32			reserved2[5];
-
-    u16			qe_self_seq;
-    l2_kcqe_opcode_t	opcode;
-    l2_kcqe_flags_t	flags;
-};
-#endif
-
-/*
- *  l2_kcqe_vm_remove_rx_filter definition
- */
-#if defined(BIG_ENDIAN)
-struct l2_kcqe_vm_remove_rx_filter {
-	u8			qid;
-	u8			status;
-	u16			reserved1;
-	u32			reserved2[5];
-
-	l2_kcqe_flags_t	flags;
-	l2_kcqe_opcode_t	opcode;
-	u16			qe_self_seq;
-};
-#elif defined(LITTLE_ENDIAN)
-struct l2_kcqe_vm_remove_rx_filter {
-	u16			reserved1;
-	u8			status;
-	u8			qid;
-	u32			reserved2[5];
-
-	u16			qe_self_seq;
-	l2_kcqe_opcode_t	opcode;
-	l2_kcqe_flags_t	flags;
-};
-#endif
-
-/*
- *  kwqe definition
- */
-#if defined(__BIG_ENDIAN)
-struct l2_kwqe {
-	u8 kwqe_flags;
-		#define KWQE_FLAGS_LAYER_MASK                       (0x7<<4)
-		#define KWQE_FLAGS_LAYER_MASK_MISC                  (0<<4)
-		#define KWQE_FLAGS_LAYER_MASK_L2                    (2<<4)
-		#define KWQE_FLAGS_LAYER_MASK_L3                    (3<<4)
-		#define KWQE_FLAGS_LAYER_MASK_L4                    (4<<4)
-		#define KWQE_FLAGS_LAYER_MASK_L5                    (5<<4)
-		#define KWQE_FLAGS_NEXT                             (1<<7)
-	u8 kwqe_opcode;
-	u16 kwqe_info;
-	u32 kwqe_info0;
-	u32 kwqe_info1;
-	u32 kwqe_info2;
-	u32 kwqe_info3;
-	u32 kwqe_info4;
-	u32 kwqe_info5;
-	u32 kwqe_info6;
-};
-#elif defined(__LITTLE_ENDIAN)
-struct l2_kwqe {
-	u16 kwqe_info;
-	u8 kwqe_opcode;
-	u8 kwqe_flags;
-		#define KWQE_FLAGS_LAYER_MASK                       (0x7<<4)
-		#define KWQE_FLAGS_LAYER_MASK_MISC                  (0<<4)
-		#define KWQE_FLAGS_LAYER_MASK_L2                    (2<<4)
-		#define KWQE_FLAGS_LAYER_MASK_L3                    (3<<4)
-		#define KWQE_FLAGS_LAYER_MASK_L4                    (4<<4)
-		#define KWQE_FLAGS_LAYER_MASK_L5                    (5<<4)
-		#define KWQE_FLAGS_GET_DEBUG_TRACE                  (7<<4)
-		#define KWQE_FLAGS_NEXT                             (1<<7)
-	u32 kwqe_info0;
-	u32 kwqe_info1;
-	u32 kwqe_info2;
-	u32 kwqe_info3;
-	u32 kwqe_info4;
-	u32 kwqe_info5;
-	u32 kwqe_info6;
-};
-#endif
-
-typedef u8 l2_kwqe_flags_t;
-	#define L2_KWQE_FLAGS_LAYER_MASK                    (0x7<<4)
-	#define L2_KWQE_FLAGS_LAYER_MASK_MISC               (0<<4)
-	#define L2_KWQE_FLAGS_LAYER_MASK_L2                 (2<<4)
-	#define L2_KWQE_FLAGS_LAYER_MASK_L3                 (3<<4)
-	#define L2_KWQE_FLAGS_LAYER_MASK_L4                 (4<<4)
-	#define L2_KWQE_FLAGS_LAYER_MASK_L5                 (5<<4)
-	#define L2_KWQE_FLAGS_NEXT                          (1<<7)
-
-typedef u8 l2_kwqe_opcode_t;
-	#define L2_KWQE_OPCODE_VALUE                        (0xff<<0)
-	#define L2_KWQE_OPCODE_VALUE_NOP                    (0<<0)
-	#define L2_KWQE_OPCODE_VALUE_ENABLE_RSS             (1<<0)
-	#define L2_KWQE_OPCODE_VALUE_DISABLE_RSS            (2<<0)
-	#define L2_KWQE_OPCODE_VALUE_UPDATE_RSS             (3<<0)
-	#define L2_KWQE_OPCODE_VALUE_FLUSH_BD_CHAIN         (4<<0)
-	#define L2_KWQE_OPCODE_VALUE_VM_ALLOC_TX_QUEUE      (5<<0)
-	#define L2_KWQE_OPCODE_VALUE_VM_FREE_TX_QUEUE       (6<<0)
-	#define L2_KWQE_OPCODE_VALUE_VM_ALLOC_RX_QUEUE      (7<<0)
-	#define L2_KWQE_OPCODE_VALUE_VM_FREE_RX_QUEUE       (8<<0)
-	#define L2_KWQE_OPCODE_VALUE_VM_SET_RX_FILTER       (9<<0)
-	#define L2_KWQE_OPCODE_VALUE_VM_REMOVE_RX_FILTER    (10<<0)
-
-typedef u8 l2_kwqe_vm_filter_t;
-	#define L2_VM_FILTER_UNDEFINED			0
-	#define L2_VM_FILTER_MAC			1
-	#define L2_VM_FILTER_MAC_VLAN			2
-	#define L2_VM_FILTER_VLAN			3
-
-typedef u8 l2_kwqe_queue_t;
-	#define L2_NORMAL_QUEUE				0
-	#define L2_NET_QUEUE				1
-	#define L2_VM_QUEUE				2
-	#define L2_VM_DROP_QUEUE			3
-
-/*
- *  l2_kwqe_vm_alloc_tx_queue definition
- */
-#if defined(__BIG_ENDIAN)
-struct l2_kwqe_vm_alloc_tx_queue {
-	l2_kwqe_flags_t		flags;
-	l2_kwqe_opcode_t	opcode;
-	u8			queue_type;
-	u8			qid;
-	u32			reserved1[6];
-};
-#elif defined(__LITTLE_ENDIAN)
-struct l2_kwqe_vm_alloc_tx_queue {
-	u8			qid;
-	u8			queue_type;
-	l2_kwqe_opcode_t	opcode;
-	l2_kwqe_flags_t		flags;
-	u32			reserved1[6];
-};
-#endif
-
-/*
- *  l2_kwqe_vm_free_tx_queue definition
- */
-#if defined(__BIG_ENDIAN)
-struct l2_kwqe_vm_free_tx_queue {
-	l2_kwqe_flags_t		flags;
-	l2_kwqe_opcode_t	opcode;
-	u8			qid;
-	u8			reserved;
-	u32			reserved1[6];
-};
-#elif defined(__LITTLE_ENDIAN)
-struct l2_kwqe_vm_free_tx_queue {
-	u8			reserved;
-	u8			qid;
-	l2_kwqe_opcode_t	opcode;
-	l2_kwqe_flags_t		flags;
-	u32			reserved1[6];
-};
-#endif
-
-/*
- *  l2_kwqe_vm_alloc_rx_queue definition
- */
-#if defined(__BIG_ENDIAN)
-struct l2_kwqe_vm_alloc_rx_queue {
-	l2_kwqe_flags_t		flags;
-	l2_kwqe_opcode_t	opcode;
-	u8			queue_type;
-	u8			qid;
-	u32			reserved1[6];
-};
-#elif defined(__LITTLE_ENDIAN)
-struct l2_kwqe_vm_alloc_rx_queue {
-	u8			qid;
-	u8			queue_type;
-	l2_kwqe_opcode_t	kwqe_opcode;
-	l2_kwqe_flags_t		kwqe_flags;
-	u32			reserved1[6];
-};
-#endif
-
-/*
- *  l2_kwqe_vm_free_rx_queue definition
- */
-#if defined(__BIG_ENDIAN)
-struct l2_kwqe_vm_free_rx_queue {
-	l2_kwqe_flags_t		flags;
-	l2_kwqe_opcode_t	opcode;
-	u8			qid;
-	u8			reserved;
-	u32			reserved1[6];
-};
-#elif defined(__LITTLE_ENDIAN)
-struct l2_kwqe_vm_free_rx_queue {
-	u8			reserved;
-	u8			qid;
-	l2_kwqe_opcode_t	opcode;
-	l2_kwqe_flags_t		flags;
-	u32			reserved1[6];
-};
-#endif
-
-/*
- *  l2_kwqe_vm_set_rx_filter definition
- */
-#if defined(__BIG_ENDIAN)
-struct l2_kwqe_vm_set_rx_filter {
-	l2_kwqe_flags_t		flags;
-	l2_kwqe_opcode_t	opcode;
-	u8			qid;
-	l2_kwqe_vm_filter_t	filter_type;
-	u16			vlan;
-	u8			mac_addr[6];
-	u32			reserved1[4];
-} l2_kwqe_vm_set_rx_filter_b_t;
-#elif defined(__LITTLE_ENDIAN)
-struct l2_kwqe_vm_set_rx_filter {
-	l2_kwqe_vm_filter_t	filter_type;
-	u8			qid;
-	l2_kwqe_opcode_t	opcode;
-	l2_kwqe_flags_t		flags;
-
-	u16			mac_addr_hi;
-	u16			vlan;
-	u32			mac_addr_lo;
-	u32			reserved1[4];
-};
-#endif
-
-/*
- * l2_kwqe_vm_remove_rx_filter
- */
-#if defined(BIG_ENDIAN)
-struct l2_kwqe_vm_remove_rx_filter {
-	l2_kwqe_flags_t		flags;
-	l2_kwqe_opcode_t	opcode;
-	u8			qid;
-	l2_kwqe_vm_filter_t	filter_type;
-	u32			reserved1[6];
-};
-#elif defined(__LITTLE_ENDIAN)
-struct l2_kwqe_vm_remove_rx_filter {
-	l2_kwqe_vm_filter_t	filter_type;
-	u8			qid;
-	l2_kwqe_opcode_t	opcode;
-	l2_kwqe_flags_t		flags;
-	u32			reserved1[6];
-};
-#endif
-#endif
 
 /* Hardware data structures and register definitions automatically
  * generated from RTL code. Do not modify.
@@ -981,7 +66,7 @@ struct rx_bd {
  *  status_block definition
  */
 struct status_block {
-	volatile u32 status_attn_bits;
+	u32 status_attn_bits;
 		#define STATUS_ATTN_BITS_LINK_STATE		(1L<<0)
 		#define STATUS_ATTN_BITS_TX_SCHEDULER_ABORT	(1L<<1)
 		#define STATUS_ATTN_BITS_TX_BD_READ_ABORT	(1L<<2)
@@ -1013,85 +98,84 @@ struct status_block {
 		#define STATUS_ATTN_BITS_EPB_ERROR		(1L<<30)
 		#define STATUS_ATTN_BITS_PARITY_ERROR		(1L<<31)
 
-	volatile u32 status_attn_bits_ack;
+	u32 status_attn_bits_ack;
 #if defined(__BIG_ENDIAN)
-	volatile u16 status_tx_quick_consumer_index0;
-	volatile u16 status_tx_quick_consumer_index1;
-	volatile u16 status_tx_quick_consumer_index2;
-	volatile u16 status_tx_quick_consumer_index3;
-	volatile u16 status_rx_quick_consumer_index0;
-	volatile u16 status_rx_quick_consumer_index1;
-	volatile u16 status_rx_quick_consumer_index2;
-	volatile u16 status_rx_quick_consumer_index3;
-	volatile u16 status_rx_quick_consumer_index4;
-	volatile u16 status_rx_quick_consumer_index5;
-	volatile u16 status_rx_quick_consumer_index6;
-	volatile u16 status_rx_quick_consumer_index7;
-	volatile u16 status_rx_quick_consumer_index8;
-	volatile u16 status_rx_quick_consumer_index9;
-	volatile u16 status_rx_quick_consumer_index10;
-	volatile u16 status_rx_quick_consumer_index11;
-	volatile u16 status_rx_quick_consumer_index12;
-	volatile u16 status_rx_quick_consumer_index13;
-	volatile u16 status_rx_quick_consumer_index14;
-	volatile u16 status_rx_quick_consumer_index15;
-	volatile u16 status_completion_producer_index;
-	volatile u16 status_cmd_consumer_index;
-	volatile u16 status_idx;
-	volatile u8 status_unused;
-	volatile u8 status_blk_num;
+	u16 status_tx_quick_consumer_index0;
+	u16 status_tx_quick_consumer_index1;
+	u16 status_tx_quick_consumer_index2;
+	u16 status_tx_quick_consumer_index3;
+	u16 status_rx_quick_consumer_index0;
+	u16 status_rx_quick_consumer_index1;
+	u16 status_rx_quick_consumer_index2;
+	u16 status_rx_quick_consumer_index3;
+	u16 status_rx_quick_consumer_index4;
+	u16 status_rx_quick_consumer_index5;
+	u16 status_rx_quick_consumer_index6;
+	u16 status_rx_quick_consumer_index7;
+	u16 status_rx_quick_consumer_index8;
+	u16 status_rx_quick_consumer_index9;
+	u16 status_rx_quick_consumer_index10;
+	u16 status_rx_quick_consumer_index11;
+	u16 status_rx_quick_consumer_index12;
+	u16 status_rx_quick_consumer_index13;
+	u16 status_rx_quick_consumer_index14;
+	u16 status_rx_quick_consumer_index15;
+	u16 status_completion_producer_index;
+	u16 status_cmd_consumer_index;
+	u16 status_idx;
+	u8 status_unused;
+	u8 status_blk_num;
 #elif defined(__LITTLE_ENDIAN)
-	volatile u16 status_tx_quick_consumer_index1;
-	volatile u16 status_tx_quick_consumer_index0;
-	volatile u16 status_tx_quick_consumer_index3;
-	volatile u16 status_tx_quick_consumer_index2;
-	volatile u16 status_rx_quick_consumer_index1;
-	volatile u16 status_rx_quick_consumer_index0;
-	volatile u16 status_rx_quick_consumer_index3;
-	volatile u16 status_rx_quick_consumer_index2;
-	volatile u16 status_rx_quick_consumer_index5;
-	volatile u16 status_rx_quick_consumer_index4;
-	volatile u16 status_rx_quick_consumer_index7;
-	volatile u16 status_rx_quick_consumer_index6;
-	volatile u16 status_rx_quick_consumer_index9;
-	volatile u16 status_rx_quick_consumer_index8;
-	volatile u16 status_rx_quick_consumer_index11;
-	volatile u16 status_rx_quick_consumer_index10;
-	volatile u16 status_rx_quick_consumer_index13;
-	volatile u16 status_rx_quick_consumer_index12;
-	volatile u16 status_rx_quick_consumer_index15;
-	volatile u16 status_rx_quick_consumer_index14;
-	volatile u16 status_cmd_consumer_index;
-	volatile u16 status_completion_producer_index;
-	volatile u8 status_blk_num;
-	volatile u8 status_unused;
-	volatile u16 status_idx;
+	u16 status_tx_quick_consumer_index1;
+	u16 status_tx_quick_consumer_index0;
+	u16 status_tx_quick_consumer_index3;
+	u16 status_tx_quick_consumer_index2;
+	u16 status_rx_quick_consumer_index1;
+	u16 status_rx_quick_consumer_index0;
+	u16 status_rx_quick_consumer_index3;
+	u16 status_rx_quick_consumer_index2;
+	u16 status_rx_quick_consumer_index5;
+	u16 status_rx_quick_consumer_index4;
+	u16 status_rx_quick_consumer_index7;
+	u16 status_rx_quick_consumer_index6;
+	u16 status_rx_quick_consumer_index9;
+	u16 status_rx_quick_consumer_index8;
+	u16 status_rx_quick_consumer_index11;
+	u16 status_rx_quick_consumer_index10;
+	u16 status_rx_quick_consumer_index13;
+	u16 status_rx_quick_consumer_index12;
+	u16 status_rx_quick_consumer_index15;
+	u16 status_rx_quick_consumer_index14;
+	u16 status_cmd_consumer_index;
+	u16 status_completion_producer_index;
+	u8 status_blk_num;
+	u8 status_unused;
+	u16 status_idx;
 #endif
 };
-
 
 /*
  *  status_block definition
  */
 struct status_block_msix {
 #if defined(__BIG_ENDIAN)
-	volatile u16 status_tx_quick_consumer_index;
-	volatile u16 status_rx_quick_consumer_index;
-	volatile u16 status_completion_producer_index;
-	volatile u16 status_cmd_consumer_index;
-	volatile u32 status_unused;
-	volatile u16 status_idx;
-	volatile u8 status_unused2;
-	volatile u8 status_blk_num;
+	u16 status_tx_quick_consumer_index;
+	u16 status_rx_quick_consumer_index;
+	u16 status_completion_producer_index;
+	u16 status_cmd_consumer_index;
+	u32 status_unused;
+	u16 status_idx;
+	u8 status_unused2;
+	u8 status_blk_num;
 #elif defined(__LITTLE_ENDIAN)
-	volatile u16 status_rx_quick_consumer_index;
-	volatile u16 status_tx_quick_consumer_index;
-	volatile u16 status_cmd_consumer_index;
-	volatile u16 status_completion_producer_index;
-	volatile u32 status_unused;
-	volatile u8 status_blk_num;
-	volatile u8 status_unused2;
-	volatile u16 status_idx;
+	u16 status_rx_quick_consumer_index;
+	u16 status_tx_quick_consumer_index;
+	u16 status_cmd_consumer_index;
+	u16 status_completion_producer_index;
+	u32 status_unused;
+	u8 status_blk_num;
+	u8 status_unused2;
+	u16 status_idx;
 #endif
 };
 
@@ -1225,7 +309,6 @@ struct l2_fhdr {
 #endif
 };
 
-#define BNX2_RX_OFFSET		(sizeof(struct l2_fhdr) + 2)
 
 /*
  *  l2_context definition
@@ -1265,7 +348,7 @@ struct l2_fhdr {
 #define BNX2_L2CTX_BD_PRE_READ				0x00000000
 #define BNX2_L2CTX_CTX_SIZE				0x00000000
 #define BNX2_L2CTX_CTX_TYPE				0x00000000
-#define BNX2_L2CTX_LO_WATER_MARK_DEFAULT		 4
+#define BNX2_L2CTX_LO_WATER_MARK_DEFAULT		 32
 #define BNX2_L2CTX_LO_WATER_MARK_SCALE			 4
 #define BNX2_L2CTX_LO_WATER_MARK_DIS			 0
 #define BNX2_L2CTX_HI_WATER_MARK_SHIFT			 4
@@ -1277,12 +360,6 @@ struct l2_fhdr {
 #define BNX2_L2CTX_CTX_TYPE_CTX_BD_CHN_TYPE_VALUE	 (1<<28)
 
 #define BNX2_L2CTX_HOST_BDIDX				0x00000004
-#define BNX2_L2CTX_L5_STATUSB_NUM_SHIFT			 16
-#define BNX2_L2CTX_L2_STATUSB_NUM_SHIFT			 24
-#define BNX2_L2CTX_L5_STATUSB_NUM(sb_id)		\
-	(((sb_id) > 0) ? (((sb_id) + 7) << BNX2_L2CTX_L5_STATUSB_NUM_SHIFT) : 0)
-#define BNX2_L2CTX_L2_STATUSB_NUM(sb_id)		\
-	(((sb_id) > 0) ? (((sb_id) + 7) << BNX2_L2CTX_L2_STATUSB_NUM_SHIFT) : 0)
 #define BNX2_L2CTX_HOST_BSEQ				0x00000008
 #define BNX2_L2CTX_NX_BSEQ				0x0000000c
 #define BNX2_L2CTX_NX_BDHADDR_HI			0x00000010
@@ -1300,9 +377,6 @@ struct l2_fhdr {
  *  pci_config_l definition
  *  offset: 0000
  */
-#define BNX2_PCICFG_MSI_CONTROL				0x00000058
-#define BNX2_PCICFG_MSI_CONTROL_ENABLE			 (1L<<16)
-
 #define BNX2_PCICFG_MISC_CONFIG				0x00000068
 #define BNX2_PCICFG_MISC_CONFIG_TARGET_BYTE_SWAP	 (1L<<2)
 #define BNX2_PCICFG_MISC_CONFIG_TARGET_MB_WORD_SWAP	 (1L<<3)
@@ -5083,23 +4157,6 @@ struct l2_fhdr {
 
 
 /*
- *  rlup_reg definition
- *  offset: 0x2000
- */
-#define BNX2_RLUP_RSS_CONFIG				0x0000201c
-#define BNX2_RLUP_RSS_CONFIG_IPV4_RSS_TYPE_XI		 (0x3L<<0)
-#define BNX2_RLUP_RSS_CONFIG_IPV4_RSS_TYPE_OFF_XI	 (0L<<0)
-#define BNX2_RLUP_RSS_CONFIG_IPV4_RSS_TYPE_ALL_XI	 (1L<<0)
-#define BNX2_RLUP_RSS_CONFIG_IPV4_RSS_TYPE_IP_ONLY_XI	 (2L<<0)
-#define BNX2_RLUP_RSS_CONFIG_IPV4_RSS_TYPE_RES_XI	 (3L<<0)
-#define BNX2_RLUP_RSS_CONFIG_IPV6_RSS_TYPE_XI		 (0x3L<<2)
-#define BNX2_RLUP_RSS_CONFIG_IPV6_RSS_TYPE_OFF_XI	 (0L<<2)
-#define BNX2_RLUP_RSS_CONFIG_IPV6_RSS_TYPE_ALL_XI	 (1L<<2)
-#define BNX2_RLUP_RSS_CONFIG_IPV6_RSS_TYPE_IP_ONLY_XI	 (2L<<2)
-#define BNX2_RLUP_RSS_CONFIG_IPV6_RSS_TYPE_RES_XI	 (3L<<2)
-
-
-/*
  *  rbuf_reg definition
  *  offset: 0x200000
  */
@@ -5124,14 +4181,7 @@ struct l2_fhdr {
 
 #define BNX2_RBUF_CONFIG				0x0020000c
 #define BNX2_RBUF_CONFIG_XOFF_TRIP			 (0x3ffL<<0)
-#define BNX2_RBUF_CONFIG_XOFF_TRIP_VAL(mtu)		 \
-	((((mtu) - 1500) * 31 / 1000) + 54)
 #define BNX2_RBUF_CONFIG_XON_TRIP			 (0x3ffL<<16)
-#define BNX2_RBUF_CONFIG_XON_TRIP_VAL(mtu)		 \
-	((((mtu) - 1500) * 39 / 1000) + 66)
-#define BNX2_RBUF_CONFIG_VAL(mtu)			 \
-	(BNX2_RBUF_CONFIG_XOFF_TRIP_VAL(mtu) |		 \
-	(BNX2_RBUF_CONFIG_XON_TRIP_VAL(mtu) << 16))
 
 #define BNX2_RBUF_FW_BUF_ALLOC				0x00200010
 #define BNX2_RBUF_FW_BUF_ALLOC_VALUE			 (0x1ffL<<7)
@@ -5153,25 +4203,11 @@ struct l2_fhdr {
 
 #define BNX2_RBUF_CONFIG2				0x0020001c
 #define BNX2_RBUF_CONFIG2_MAC_DROP_TRIP			 (0x3ffL<<0)
-#define BNX2_RBUF_CONFIG2_MAC_DROP_TRIP_VAL(mtu)	 \
-	((((mtu) - 1500) * 4 / 1000) + 5)
 #define BNX2_RBUF_CONFIG2_MAC_KEEP_TRIP			 (0x3ffL<<16)
-#define BNX2_RBUF_CONFIG2_MAC_KEEP_TRIP_VAL(mtu)	 \
-	((((mtu) - 1500) * 2 / 100) + 30)
-#define BNX2_RBUF_CONFIG2_VAL(mtu)			 \
-	(BNX2_RBUF_CONFIG2_MAC_DROP_TRIP_VAL(mtu) |	 \
-	(BNX2_RBUF_CONFIG2_MAC_KEEP_TRIP_VAL(mtu) << 16))
 
 #define BNX2_RBUF_CONFIG3				0x00200020
 #define BNX2_RBUF_CONFIG3_CU_DROP_TRIP			 (0x3ffL<<0)
-#define BNX2_RBUF_CONFIG3_CU_DROP_TRIP_VAL(mtu)		 \
-	((((mtu) - 1500) * 12 / 1000) + 18)
 #define BNX2_RBUF_CONFIG3_CU_KEEP_TRIP			 (0x3ffL<<16)
-#define BNX2_RBUF_CONFIG3_CU_KEEP_TRIP_VAL(mtu)		 \
-	((((mtu) - 1500) * 2 / 100) + 30)
-#define BNX2_RBUF_CONFIG3_VAL(mtu)			 \
-	(BNX2_RBUF_CONFIG3_CU_DROP_TRIP_VAL(mtu) |	 \
-	(BNX2_RBUF_CONFIG3_CU_KEEP_TRIP_VAL(mtu) << 16))
 
 #define BNX2_RBUF_PKT_DATA				0x00208000
 #define BNX2_RBUF_CLIST_DATA				0x00210000
@@ -5455,10 +4491,6 @@ struct l2_fhdr {
 #define BNX2_MQ_MEM_RD_DATA2_VALUE			 (0x3fffffffL<<0)
 #define BNX2_MQ_MEM_RD_DATA2_VALUE_XI			 (0x7fffffffL<<0)
 
-#define BNX2_MQ_CONFIG2					0x00003d00
-#define BNX2_MQ_CONFIG2_CONT_SZ				 (0x7L<<4)
-#define BNX2_MQ_CONFIG2_FIRST_L4L5			 (0x1fL<<8)
-
 #define BNX2_MQ_MAP_L2_3				0x00003d2c
 #define BNX2_MQ_MAP_L2_3_MQ_OFFSET			 (0xffL<<0)
 #define BNX2_MQ_MAP_L2_3_SZ				 (0x3L<<8)
@@ -5470,7 +4502,6 @@ struct l2_fhdr {
 
 #define BNX2_MQ_MAP_L2_5				0x00003d34
 #define BNX2_MQ_MAP_L2_5_ARM				 (0x3L<<26)
-
 
 /*
  *  tsch_reg definition
@@ -6496,9 +5527,6 @@ struct l2_fhdr {
 #define BNX2_HC_TX_QUICK_CONS_TRIP_OFF	(BNX2_HC_TX_QUICK_CONS_TRIP_1 -	\
 					 BNX2_HC_SB_CONFIG_1)
 #define BNX2_HC_TX_TICKS_OFF	(BNX2_HC_TX_TICKS_1 - BNX2_HC_SB_CONFIG_1)
-#define BNX2_HC_RX_QUICK_CONS_TRIP_OFF	(BNX2_HC_RX_QUICK_CONS_TRIP_1 - \
-					 BNX2_HC_SB_CONFIG_1)
-#define BNX2_HC_RX_TICKS_OFF	(BNX2_HC_RX_TICKS_1 - BNX2_HC_SB_CONFIG_1)
 
 
 /*
@@ -6827,10 +5855,6 @@ struct l2_fhdr {
 #define BNX2_RXP_FTQ_CTL_CUR_DEPTH			 (0x3ffL<<22)
 
 #define BNX2_RXP_SCRATCH				0x000e0000
-#define BNX2_RXP_SCRATCH_RXP_FLOOD			 0x000e0024
-#define BNX2_RXP_SCRATCH_RSS_TBL_SZ			 0x000e0038
-#define BNX2_RXP_SCRATCH_RSS_TBL			 0x000e003c
-#define BNX2_RXP_SCRATCH_RSS_TBL_MAX_ENTRIES		 128
 
 
 /*
@@ -7118,8 +6142,6 @@ struct l2_fhdr {
 
 #define BNX2_CP_SCRATCH					0x001a0000
 
-#define BNX2_FW_MAX_ISCSI_CONN				 0x001a0080
-
 
 /*
  *  mcp_reg definition
@@ -7268,8 +6290,6 @@ struct l2_fhdr {
 
 #define BNX2_MCP_ROM					0x00150000
 #define BNX2_MCP_SCRATCH				0x00160000
-#define BNX2_MCP_STATE_P1				 0x0016f9c8
-#define BNX2_MCP_STATE_P0				 0x0016fdc8
 
 #define BNX2_SHM_HDR_SIGNATURE				BNX2_MCP_SCRATCH
 #define BNX2_SHM_HDR_SIGNATURE_SIG_MASK			 0xffff0000
@@ -7392,14 +6412,9 @@ struct l2_fhdr {
 #define MAX_ETHERNET_PACKET_SIZE	1514
 #define MAX_ETHERNET_JUMBO_PACKET_SIZE	9014
 
-#define BNX2_RX_COPY_THRESH		128
+#define RX_COPY_THRESH			128
 
 #define BNX2_MISC_ENABLE_DEFAULT	0x17ffffff
-
-#define BNX2_START_UNICAST_ADDRESS_INDEX	4
-#define BNX2_END_UNICAST_ADDRESS_INDEX		7
-#define BNX2_MAX_UNICAST_ADDRESSES     	(BNX2_END_UNICAST_ADDRESS_INDEX - \
-					 BNX2_START_UNICAST_ADDRESS_INDEX + 1)
 
 #define DMA_READ_CHANS	5
 #define DMA_WRITE_CHANS	3
@@ -7415,8 +6430,8 @@ struct l2_fhdr {
 #define TX_DESC_CNT  (BCM_PAGE_SIZE / sizeof(struct tx_bd))
 #define MAX_TX_DESC_CNT (TX_DESC_CNT - 1)
 
-#define MAX_RX_RINGS	16
-#define MAX_RX_PG_RINGS	64
+#define MAX_RX_RINGS	4
+#define MAX_RX_PG_RINGS	16
 #define RX_DESC_CNT  (BCM_PAGE_SIZE / sizeof(struct rx_bd))
 #define MAX_RX_DESC_CNT (RX_DESC_CNT - 1)
 #define MAX_TOTAL_RX_DESC_CNT (MAX_RX_DESC_CNT * MAX_RX_RINGS)
@@ -7463,19 +6478,9 @@ struct l2_fhdr {
 #define TX_CID		16
 #define TX_TSS_CID	32
 #define RX_CID		0
-#define RX_RSS_CID	4
-#define RX_MAX_RSS_RINGS	7
-#define RX_MAX_RINGS		(RX_MAX_RSS_RINGS + 1)
-#define TX_MAX_TSS_RINGS	7
-#define TX_MAX_RINGS		(TX_MAX_TSS_RINGS + 1)
 
 #define MB_TX_CID_ADDR	MB_GET_CID_ADDR(TX_CID)
 #define MB_RX_CID_ADDR	MB_GET_CID_ADDR(RX_CID)
-
-#if defined(__VMKLNX__) && defined(__VMKNETDDI_QUEUEOPS__)
-#define NETQUEUE_KWQ_CID                97
-#define NETQUEUE_KCQ_CID                100
-#endif
 
 struct sw_bd {
 	struct m_buf		*mbuf;
@@ -7487,17 +6492,10 @@ struct sw_pg {
 	DECLARE_PCI_UNMAP_ADDR(mapping)
 };
 
-struct sw_tx_bd {
-	struct m_buf		*mbuf;
-	unsigned short		is_gso;
-	unsigned short		nr_frags;
-	DECLARE_PCI_UNMAP_ADDR(mapping)
-};
-
 #define SW_RXBD_RING_SIZE (sizeof(struct sw_bd) * RX_DESC_CNT)
 #define SW_RXPG_RING_SIZE (sizeof(struct sw_pg) * RX_DESC_CNT)
 #define RXBD_RING_SIZE (sizeof(struct rx_bd) * RX_DESC_CNT)
-#define SW_TXBD_RING_SIZE (sizeof(struct sw_tx_bd) * TX_DESC_CNT)
+#define SW_TXBD_RING_SIZE (sizeof(struct sw_bd) * TX_DESC_CNT)
 #define TXBD_RING_SIZE (sizeof(struct tx_bd) * TX_DESC_CNT)
 
 /* Buffered flash (Atmel: AT45DB011B) specific information */
@@ -7558,116 +6556,37 @@ struct flash_spec {
 };
 
 #define BNX2_MAX_MSIX_HW_VEC	9
-#define BNX2_MAX_MSIX_VEC	9
+#define BNX2_MAX_MSIX_VEC	2
 #define BNX2_BASE_VEC		0
 #define BNX2_TX_VEC		1
 #define BNX2_TX_INT_NUM	(BNX2_TX_VEC << BNX2_PCICFG_INT_ACK_CMD_INT_NUM_SHIFT)
 
 struct bnx2_irq {
-#if (LINUX_VERSION_CODE < 0x020613)
-	irqreturn_t	(*handler)(int, void *, struct pt_regs *);
-#else
 	irq_handler_t	handler;
-#endif
-	unsigned int	vector;
+	u16		vector;
 	u8		requested;
 	char		name[16];
 };
 
-struct bnx2_tx_ring_info {
-	u32			tx_prod_bseq;
-	u16			tx_prod;
-	u32			tx_bidx_addr;
-	u32			tx_bseq_addr;
-
-	struct tx_bd		*tx_desc_ring;
-	struct sw_tx_bd		*tx_buf_ring;
+struct bnx2_napi {
+	struct napi_struct	napi		____cacheline_aligned;
+	struct bnx2		*bp;
+	struct status_block	*status_blk;
+	struct status_block_msix	*status_blk_msix;
+	u32 			last_status_idx;
+	u32			int_num;
 
 	u16			tx_cons;
 	u16			hw_tx_cons;
 
-	dma_addr_t		tx_desc_mapping;
-};
-
-struct bnx2_rx_ring_info {
 	u32			rx_prod_bseq;
 	u16			rx_prod;
 	u16			rx_cons;
 
-	u32			rx_bidx_addr;
-	u32			rx_bseq_addr;
-	u32			rx_pg_bidx_addr;
-
 	u16			rx_pg_prod;
 	u16			rx_pg_cons;
 
-	struct sw_bd		*rx_buf_ring;
-	struct rx_bd		*rx_desc_ring[MAX_RX_RINGS];
-	struct sw_pg		*rx_pg_ring;
-	struct rx_bd		*rx_pg_desc_ring[MAX_RX_PG_RINGS];
-
-	dma_addr_t		rx_desc_mapping[MAX_RX_RINGS];
-	dma_addr_t		rx_pg_desc_mapping[MAX_RX_PG_RINGS];
 };
-
-struct bnx2_napi {
-#ifdef BNX2_NEW_NAPI
-	struct napi_struct	napi		____cacheline_aligned;
-#endif
-	struct bnx2		*bp;
-	union {
-		struct status_block		*msi;
-		struct status_block_msix	*msix;
-	} status_blk;
-	volatile u16		*hw_tx_cons_ptr;
-	volatile u16		*hw_rx_cons_ptr;
-	u32 			last_status_idx;
-	u32			int_num;
-
-	u32			cnic_tag;
-	int			cnic_present;
-
-	struct bnx2_rx_ring_info	rx_ring;
-	struct bnx2_tx_ring_info	tx_ring;
-
-#if defined(__VMKLNX__) && defined(__VMKNETDDI_QUEUEOPS__)
-	u8			rx_queue_allocated;
-	u8			tx_queue_allocated;
-	u8			rx_queue_active;
-	u8			tx_queue_active;
-
-	vmknetddi_queueops_filter_class_t class;
-	u16			vlan_id;
-	u8			mac_filter_addr[6];
-	u8			netq_flags;
-#define BNX2_NETQ_FREE_TX_QUEUE_STATE	0x0001
-	u8			netq_state;
-#define BNX2_NETQ_SUSPENDED		0x0004
-#define BNX2_NETQ_RX_FILTER_APPLIED	0x0010
-
-	u32			tx_packets_sent;
-	u32			tx_packets_processed;
-
-	struct net_device_stats	stats;
-#endif
-};
-
-#if defined(__VMKLNX__) && defined(__VMKNETDDI_QUEUEOPS__)
-struct netq_dma {
-	int			num_pages;
-	void			**pg_arr;
-	dma_addr_t		*pg_map_arr;
-	int			pgtbl_size;
-	u32			*pgtbl;
-	dma_addr_t		pgtbl_map;
-};
-
-struct netq_ctx {
-	u32			cid;
-	void			*ctx;
-	dma_addr_t		mapping;
-};
-#endif
 
 struct bnx2 {
 	/* Fields used in the tx and intr/napi performance paths are grouped */
@@ -7693,8 +6612,14 @@ struct bnx2 {
 #define BNX2_FLAG_USING_MSI_OR_MSIX	(BNX2_FLAG_USING_MSI | \
 					 BNX2_FLAG_USING_MSIX)
 #define BNX2_FLAG_JUMBO_BROKEN		0x00000800
-#define BNX2_FLAG_CAN_KEEP_VLAN		0x00001000
-#define BNX2_FLAG_BROKEN_STATS		0x00002000
+
+	/* Put tx producer and consumer fields in separate cache lines. */
+
+	u32		tx_prod_bseq __attribute__((aligned(L1_CACHE_BYTES)));
+	u16		tx_prod;
+	u8		tx_vec;
+	u32		tx_bidx_addr;
+	u32		tx_bseq_addr;
 
 	struct bnx2_napi	bnx2_napi[BNX2_MAX_MSIX_VEC];
 
@@ -7702,6 +6627,7 @@ struct bnx2 {
 	struct			vlan_group *vlgrp;
 #endif
 
+	u32			rx_offset;
 	u32			rx_buf_use_size;	/* useable size */
 	u32			rx_buf_size;		/* with alignment */
 	u32			rx_copy_thresh;
@@ -7711,26 +6637,26 @@ struct bnx2 {
 
 	u32			rx_csum;
 
+	struct sw_bd		*rx_buf_ring;
+	struct rx_bd		*rx_desc_ring[MAX_RX_RINGS];
+	struct sw_pg		*rx_pg_ring;
+	struct rx_bd		*rx_pg_desc_ring[MAX_RX_PG_RINGS];
+
 	/* TX constants */
+	struct tx_bd	*tx_desc_ring;
+	struct sw_bd	*tx_buf_ring;
 	int		tx_ring_size;
 	u32		tx_wake_thresh;
 
-	struct cnic_ops		*cnic_ops;
-	void			*cnic_data;
-
 	/* End of fields used in the performance code paths. */
 
-	unsigned int		current_interval;
-#define BNX2_TIMER_INTERVAL		HZ
-#define BNX2_SERDES_AN_TIMEOUT		(HZ / 3)
-#define BNX2_SERDES_FORCED_TIMEOUT	(HZ / 10)
+	char			*name;
 
+	int			timer_interval;
+	int			current_interval;
 	struct			timer_list timer;
-#if (LINUX_VERSION_CODE >= 0x020600)
 	struct work_struct	reset_task;
-#else
-	struct tq_struct	reset_task;
-#endif
+	int			in_reset_task;
 
 	/* Used to synchronize phy accesses. */
 	spinlock_t		phy_lock;
@@ -7792,16 +6718,21 @@ struct bnx2 {
 	u16			bus_speed_mhz;
 	u8			wol;
 
-	u8			index;
+	u8			pad;
 
 	u16			fw_wr_seq;
 	u16			fw_drv_pulse_wr_seq;
 
+	dma_addr_t		tx_desc_mapping;
+
+
 	int			rx_max_ring;
 	int			rx_ring_size;
+	dma_addr_t		rx_desc_mapping[MAX_RX_RINGS];
 
 	int			rx_max_pg_ring;
 	int			rx_pg_ring_size;
+	dma_addr_t		rx_pg_desc_mapping[MAX_RX_PG_RINGS];
 
 	u16			tx_quick_cons_trip;
 	u16			tx_quick_cons_trip_int;
@@ -7820,6 +6751,7 @@ struct bnx2 {
 
 	u32			stats_ticks;
 
+	struct status_block	*status_blk;
 	dma_addr_t		status_blk_mapping;
 
 	struct statistics_block	*stats_blk;
@@ -7845,9 +6777,10 @@ struct bnx2 {
 						/* req_flow_ctrl if autoneg  */
 #ifndef FLOW_CTRL_TX
 #define FLOW_CTRL_TX		1
+#endif
+#ifndef FLOW_CTRL_RX
 #define FLOW_CTRL_RX		2
 #endif
-
 	u32			advertising;
 
 	u8			req_flow_ctrl;	/* flow ctrl advertisement */
@@ -7862,6 +6795,8 @@ struct bnx2 {
 #define PHY_LOOPBACK		2
 
 	u8			serdes_an_pending;
+#define SERDES_AN_TIMEOUT	(HZ / 3)
+#define SERDES_FORCED_TIMEOUT	(HZ / 10)
 
 	u8			mac_addr[8];
 
@@ -7874,64 +6809,13 @@ struct bnx2 {
 
 	struct net_device_stats net_stats;
 
-	const struct flash_spec	*flash_info;
+	struct flash_spec	*flash_info;
 	u32			flash_size;
 
 	int			status_stats_size;
 
-	struct z_stream_s	*strm;
-	void			*gunzip_buf;
-
 	struct bnx2_irq		irq_tbl[BNX2_MAX_MSIX_VEC];
 	int			irq_nvecs;
-
-	u8			num_tx_rings;
-	u8			num_rx_rings;
-
-	u32 			idle_chk_status_idx;
-
-#ifdef BCM_CNIC
-	struct mutex		cnic_lock;
-	struct cnic_eth_dev	cnic_eth_dev;
-#endif
-
-#if defined(__VMKLNX__) && defined(__VMKNETDDI_QUEUEOPS__)
-	u16			n_rx_queues_allocated;
-	u16			n_tx_queues_allocated;
-
-	/* KWQ/KCQ for NetQueue */
-	u32			netq_kwq_cid_addr;
-	u32			netq_kcq_cid_addr;
-
-	struct netq_dma		netq_kwq_info;
-	struct l2_kwqe		**netq_kwq;
-
-	u16			netq_kwq_prod_idx;
-	u32			netq_kwq_io_addr;
-
-	u16		 	netq_kwq_con_idx;
-
-	struct netq_dma		netq_kcq_info;
-	struct l2_kcqe		**netq_kcq;
-
-	u16			netq_kcq_prod_idx;
-	u32			netq_kcq_io_addr;
-
-	u32			netq_last_status_idx;
-
-#define BNX2_NETQ_MAX_COMPLETED_KCQE	8
-	struct l2_kcqe		*netq_completed_kcq[BNX2_NETQ_MAX_COMPLETED_KCQE];
-
-	u8			netq_flags;
-	u8			netq_enabled;
-	u8			netq_state;
-#define BNX2_NETQ_HW_OPENED		0x0001
-#define BNX2_NETQ_HW_STARTED		0x0002
-	u8			reserved1[1];
-
-	wait_queue_head_t	netq_wait;
-#endif
-	u8			reset_failed;
 
 	int nta_index;
 };
@@ -7976,7 +6860,7 @@ struct fw_info {
 	const u32 text_len;
 	const u32 text_index;
 	__le32 *text;
-	const u8 *gz_text;
+	u8 *gz_text;
 	const u32 gz_text_len;
 
 	/* Data section. */
@@ -8002,10 +6886,6 @@ struct fw_info {
 	const u32 *rodata;
 };
 
-#define RV2P_P1_FIXUP_PAGE_SIZE_IDX		0
-#define RV2P_BD_PAGE_SIZE_MSK			0xffff
-#define RV2P_BD_PAGE_SIZE			((BCM_PAGE_SIZE / 16) - 1)
-
 #define RV2P_PROC1                              0
 #define RV2P_PROC2                              1
 
@@ -8013,14 +6893,14 @@ struct fw_info {
 /* This value (in milliseconds) determines the frequency of the driver
  * issuing the PULSE message code.  The firmware monitors this periodic
  * pulse to determine when to switch to an OS-absent mode. */
-#define BNX2_DRV_PULSE_PERIOD_MS                 250
+#define DRV_PULSE_PERIOD_MS                 250
 
 /* This value (in milliseconds) determines how long the driver should
  * wait for an acknowledgement from the firmware before timing out.  Once
  * the firmware has timed out, the driver will assume there is no firmware
  * running and there won't be any firmware-driver synchronization during a
  * driver reset. */
-#define BNX2_FW_ACK_TIME_OUT_MS			1000
+#define FW_ACK_TIME_OUT_MS                  1000
 
 
 #define BNX2_DRV_RESET_SIGNATURE		0x00000000
@@ -8038,7 +6918,6 @@ struct fw_info {
 #define BNX2_DRV_MSG_CODE_DIAG			 0x07000000
 #define BNX2_DRV_MSG_CODE_SUSPEND_NO_WOL	 0x09000000
 #define BNX2_DRV_MSG_CODE_UNLOAD_LNK_DN		 0x0b000000
-#define BNX2_DRV_MSG_CODE_KEEP_VLAN_UPDATE	 0x0d000000
 #define BNX2_DRV_MSG_CODE_CMD_SET_LINK		 0x10000000
 
 #define BNX2_DRV_MSG_DATA			 0x00ff0000
@@ -8367,10 +7246,6 @@ struct fw_info {
 #define BNX2_FW_CAP_SIGNATURE_MASK		 0xffff0000
 #define BNX2_FW_CAP_REMOTE_PHY_CAPABLE		 0x00000001
 #define BNX2_FW_CAP_REMOTE_PHY_PRESENT		 0x00000002
-#define BNX2_FW_CAP_MFW_CAN_KEEP_VLAN		 0x00000008
-#define BNX2_FW_CAP_BC_CAN_KEEP_VLAN		 0x00000010
-#define BNX2_FW_CAP_CAN_KEEP_VLAN	(BNX2_FW_CAP_BC_CAN_KEEP_VLAN | \
-					 BNX2_FW_CAP_MFW_CAN_KEEP_VLAN)
 
 #define BNX2_RPHY_SIGNATURE			0x36c
 #define BNX2_RPHY_LOAD_SIGNATURE		 0x5a5a5a5a
@@ -8380,52 +7255,5 @@ struct fw_info {
 #define BNX2_RPHY_COPPER_LINK			0x378
 
 #define HOST_VIEW_SHMEM_BASE			0x167c00
-
-#if defined(BNX2_VMWARE_BMAPILNX)
-
-#define BNX2_VMWARE_CIM_CMD_ENABLE_NIC		0x0001
-#define BNX2_VMWARE_CIM_CMD_DISABLE_NIC		0x0002
-#define BNX2_VMWARE_CIM_CMD_REG_READ		0x0003
-#define BNX2_VMWARE_CIM_CMD_REG_WRITE		0x0004
-#define BNX2_VMWARE_CIM_CMD_GET_NIC_PARAM	0x0005
-#define BNX2_VMWARE_CIM_CMD_GET_NIC_STATUS	0x0006
-
-struct bnx2_ioctl_reg_read_req
-{
-	u32 reg_offset;
-   	u32 reg_value;
-} __attribute__((packed));
-
-struct bnx2_ioctl_reg_write_req
-{
-	u32 reg_offset;
-	u32 reg_value;
-} __attribute__((packed));
-
-struct bnx2_ioctl_get_nic_param_req
-{
-	u32 version;
-	u32 mtu;
-	u8  current_mac_addr[8];
-} __attribute__((packed));
-
-struct bnx2_ioctl_get_nic_status_req
-{
-	u32 nic_status; // 1: Up, 0: Down
-} __attribute__((packed));
-
-struct bnx2_ioctl_req 
-{
-	u32 cmd;
-	union {
-		// no struct for reset_nic command
-		struct bnx2_ioctl_reg_read_req reg_read;
-		struct bnx2_ioctl_reg_write_req reg_write;
-		struct bnx2_ioctl_get_nic_param_req get_nic_param;
-		struct bnx2_ioctl_get_nic_status_req get_nic_status;
-	} cmd_req;
-} __attribute__((packed));
-
-#endif  /* BNX2_VMWARE_BMAPILNX */
 
 #endif

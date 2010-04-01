@@ -368,11 +368,13 @@ static inline bool mbuf_rx_queue_recorded(const struct m_buf *mbuf)
 	return (mbuf->queue_mapping != 0);
 }
 
-int mbuf_dma_map(struct device *dev, struct m_buf *mbuf,
-		enum dma_data_direction dir);
 
-void mbuf_dma_unmap(struct device *dev, struct m_buf *mbuf,
-		   enum dma_data_direction dir);
+static inline void mbuf_copy_from_linear_data_offset(const struct m_buf *mbuf,
+						    const int offset, void *to,
+						    const unsigned int len)
+{
+	memcpy(to, mbuf->data + offset, len);
+}
 
 extern struct m_buf *nta_alloc_mbuf_empty(unsigned int size, gfp_t gfp_mask);
 extern struct m_buf *nta_alloc_mbuf(struct net_device *dev, unsigned int length, gfp_t gfp_mask);
