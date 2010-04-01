@@ -175,12 +175,12 @@ static void avl_update_zc(struct avl_node *node, void *ptr, int r_size, int i)
 	unsigned long flags;
 	int pos;
 
-	//spin_lock_irqsave(&ctl->zc_lock, flags);
+	spin_lock_irqsave(&ctl->zc_lock, flags);
 	if(avl_zc_ring_unused(ctl)) {
 		pos = ctl->zcb_ring->zc_pos;
 	}else{
 		count_miss[i]++;
-		//spin_unlock_irqrestore(&ctl->zc_lock, flags);
+		spin_unlock_irqrestore(&ctl->zc_lock, flags);
 		return;
 	}
 	//spin_unlock_irqrestore(&ctl->zc_lock, flags);
@@ -205,7 +205,7 @@ static void avl_update_zc(struct avl_node *node, void *ptr, int r_size, int i)
 				__func__, ctl->zc_used, ctl->zc_pos, ctl->zc_num, ptr, zc->size, zc->off);
 	}while(0);
 
-	spin_lock_irqsave(&ctl->zc_lock, flags);
+	//spin_lock_irqsave(&ctl->zc_lock, flags);
 	ctl->zcb_ring->zc_pos = pos;
 	ctl->zc_max = 1;
 
