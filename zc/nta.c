@@ -318,7 +318,7 @@ static void nta_test_func(unsigned long data)
 	struct sig *sig;
 	struct m_buf *mbuf;
 
-	for(i=0; i<8192;i++) {
+	for(i=0; i<4096;i++) {
 		mbuf = nta_alloc_mbuf(NULL, 1522, GFP_ATOMIC);
 		if(!mbuf) {
 			continue;
@@ -404,7 +404,6 @@ static int	test_hard_start_xmit(struct m_buf *mbuf,
 	nta_kfree_mbuf(mbuf);
 	return 0;
 }
-	
 static int __init
 nta_init_module(void)
 {
@@ -416,7 +415,11 @@ nta_init_module(void)
 					      sizeof(struct m_buf),
 					      0,
 					      SLAB_HWCACHE_ALIGN|SLAB_PANIC,
-					      NULL);
+					      NULL
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,10)
+							, NULL
+#endif
+							);
 
 	if(!mbuf_head_cache) {
 		printk(KERN_ERR "Unable to allocate mbuf head cache.\n");
@@ -446,7 +449,7 @@ nta_init_module(void)
 
 	nta_proc_init();
 
-#if 1
+#if 0
 	memcpy(&test_dev.name, "fuck", 4);
 	test_dev.name[4]=0;
 	nta_register_zc(&test_dev, test_hard_start_xmit);

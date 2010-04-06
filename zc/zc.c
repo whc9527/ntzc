@@ -38,7 +38,10 @@
 #include <linux/ip.h>
 #include <linux/netdevice.h>
 #include <asm/uaccess.h>
+#include <linux/sched.h>
 #include <linux/miscdevice.h>
+#include <linux/version.h>
+#include <asm/io.h>
 
 #include "bvl.h"
 #include "nta.h"
@@ -46,7 +49,8 @@
 struct zc_private
 {
 	//struct zc_data	*zcb;
-	struct mutex	lock;
+	//struct mutex	lock;
+	spinlock_t lock;
 	int		cpu;
 	int		sniff_id;
 };
@@ -65,20 +69,71 @@ static int zc_release(struct inode *inode, struct file *file)
 static int zc_open(struct inode *inode, struct file *file)
 {
 	struct zc_private *priv;
-	struct zc_control *ctl = &zc_sniffer[0];
+	//struct zc_control *ctl = &zc_sniffer[0];
 
-	priv = kzalloc(sizeof(struct zc_private) + ctl->zc_num * sizeof(struct zc_data), GFP_KERNEL);
+	priv = kzalloc(sizeof(struct zc_private), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 	//priv->zcb = (struct zc_data *)(priv+1);
 	priv->cpu = 0; /* Use CPU0 by default */
 	priv->sniff_id = 0; /* Default sniffer id */
-	mutex_init(&priv->lock);
-
+	//mutex_init(&priv->lock);
+	spin_lock_init(&priv->lock);
 	file->private_data = priv;
 
 	return 0;
 }
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,15)
+void simple_vma_open(struct vm_area_struct *vma)
+{
+}
+ 
+void simple_vma_close(struct vm_area_struct *vma)
+{
+}
+ 
+struct page *zc_nopage(struct vm_area_struct *vma, unsigned long address, int *type)
+{
+	unsigned long offset;
+	struct page *page = NOPAGE_SIGBUS;
+	struct avl_allocator_data *alloc = &avl_allocator[0];
+	struct avl_node_entry *e;
+
+#if 0
+	if(vma->vm_pgoff != BVL_MAX_NODE_ENTRY_NUM)
+		return NULL;
+#endif
+	list_for_each_entry(e, &alloc->avl_node_list, node_entry) {
+		if(vma->vm_pgoff != e->avl_entry_num)
+			continue;
+		else
+			break;
+	}
+	if(!e){
+		printk("!!! vm_pageoff = %d\n", vma->vm_pgoff);
+		 return page;
+	}
+	{
+	struct avl_node *node = &e->avl_node_array[0][0];
+	unsigned long virt = node->value;
+	virt += (address - vma->vm_start);
+	
+	//printk("nopage address %lx vm_start %lx vm_pgoff %lx virt %x\n", 
+	//		address, vma->vm_start, vma->vm_pgoff, virt);
+	if(type)
+		*type = VM_FAULT_MINOR;
+	page = virt_to_page(virt);
+	get_page(page);
+	}
+	return page;
+}
+
+static struct vm_operations_struct simple_vm_ops = {
+        .open = simple_vma_open,
+        .close = simple_vma_close,
+	.nopage = zc_nopage,
+};
+#endif
 
 static int zc_mmap(struct file *file, struct vm_area_struct *vma)
 {
@@ -98,6 +153,11 @@ static int zc_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_flags |= VM_RESERVED;
 	vma->vm_file = file;
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,15)
+
+	vma->vm_ops = &simple_vm_ops;
+	simple_vma_open(vma);
+#else
 	//spin_lock_irqsave(&alloc->avl_node_lock, flags);
 	list_for_each_entry(e, &alloc->avl_node_list, node_entry) {
 		if (st != e->avl_entry_num) {
@@ -152,6 +212,7 @@ static int zc_mmap(struct file *file, struct vm_area_struct *vma)
 	if(!num) {
 		return -ENXIO;
 	}
+#endif
 	return err;
 }
 
@@ -163,7 +224,7 @@ static ssize_t zc_write(struct file *file, const char __user *buf, size_t size, 
 	int i, num, used;
 
 	if(size != sizeof(ring)) {
-		printk("size = %d ring size %d\n", size, sizeof(ring));
+		printk("size = %lu ring size %lu\n", size, sizeof(ring));
 		return -EINVAL;
 	}
 	if (copy_from_user(&ring, buf, size)) {
@@ -192,12 +253,11 @@ static ssize_t zc_read(struct file *file, char __user *buf, size_t size, loff_t 
 {
 	ssize_t sz = 0;
 	struct zc_private *priv = file->private_data;
-	unsigned long flags;
 	struct zc_control *ctl = &zc_sniffer[priv->sniff_id];
 	struct zc_ring ring;
 
 	if(size != sizeof(struct zc_ring)) {
-		printk("sizeof zc_ring %d, size = %d\n",
+		printk("sizeof zc_ring %lu, size = %lu\n",
 			   sizeof(struct zc_ring), size);
 		return -EINVAL;
 	}
@@ -473,8 +533,7 @@ static int zc_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	struct zc_status *st;
 	unsigned long flags;
 
-	mutex_lock(&priv->lock);
-
+	spin_lock(&priv->lock);
 	switch (cmd) {
 		case ZC_ALLOC:
 		case ZC_COMMIT:
@@ -493,7 +552,7 @@ static int zc_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 				ret = -EFAULT;
 				break;
 			}
-			if (cpu < NR_CPUS && cpu >= 0) {
+			if (cpu < NTA_NR_CPUS && cpu >= 0) {
 				priv->cpu = cpu;
 				ret = 0;
 			}
@@ -561,7 +620,7 @@ static int zc_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 					ret = -EFAULT;
 					break;
 				}
-				printk("get device name %p\n", zn.dev_name);
+				printk("get device name %s\n", zn.dev_name);
 				zn.index = zc_get_netdev(zn.dev_name);
 				printk("get device index %d\n", zn.index);
 
@@ -600,7 +659,7 @@ static int zc_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 
 	}
 
-	mutex_unlock(&priv->lock);
+	spin_unlock(&priv->lock);
 
 	return ret;
 }

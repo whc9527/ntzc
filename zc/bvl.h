@@ -31,6 +31,7 @@
 #include <linux/wait.h>
 #include <linux/spinlock.h>
 #include <asm/page.h>
+#include <linux/version.h>
 
 //#define BVL_DEBUG
 
@@ -179,6 +180,12 @@ extern unsigned long
 	count_cache[NR_CPUS], count_full[NR_CPUS],
 	count_node[NR_CPUS], count_mem[NR_CPUS],
 	count_page;
+
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,10)
+#ifndef __GFP_ZERO
+#define __GFP_ZERO 0
+#endif
+#endif
 
 #endif /* __KERNEL__ */
 #endif /* __BVL_H */
