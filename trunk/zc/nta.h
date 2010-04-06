@@ -31,11 +31,9 @@
 #include <asm/types.h>
 #include <linux/spinlock.h>
 #include <linux/net.h>
-#include <linux/textsearch.h>
 #include <net/checksum.h>
 #include <linux/rcupdate.h>
 #include <linux/dmaengine.h>
-#include <linux/hrtimer.h>
 
 #define MBUF_DATA_ALIGN(X)	(((X) + (SMP_CACHE_BYTES - 1)) & \
 				 ~(SMP_CACHE_BYTES - 1))
@@ -43,6 +41,11 @@
 #define NET_MBUF_PAD_ALLOC	64
 
 typedef unsigned char *m_buf_data_t;
+#ifndef bool
+#define bool int
+#define true 1
+#define false 0
+#endif
 
 struct m_buf {
 	/* These two members must be first. */
@@ -50,7 +53,7 @@ struct m_buf {
 	struct m_buf		*prev;
 
 	struct sock		*sk;
-	ktime_t			tstamp;
+	//ktime_t			tstamp;
 	struct net_device	*dev;
 
 	/*
@@ -149,11 +152,12 @@ struct mbuf_frag_struct {
  * This structure is attached to packets as part of the
  * &mbuf_shared_info. Use mbuf_hwtstamps() to get a pointer.
  */
+#if 0
 struct mbuf_shared_hwtstamps {
 	ktime_t	hwtstamp;
 	ktime_t	syststamp;
 };
-
+#endif
 /**
  * struct mbuf_shared_tx - instructions for time stamping of outgoing packets
  * @hardware:		generate hardware time stamp
@@ -185,7 +189,7 @@ struct mbuf_shared_info {
 	union mbuf_shared_tx tx_flags;
 	unsigned int	num_dma_maps;
 	struct m_buf	*frag_list;
-	struct mbuf_shared_hwtstamps hwtstamps;
+	//struct mbuf_shared_hwtstamps hwtstamps;
 	mbuf_frag_t	frags[MAX_MBUF_FRAGS];
 	dma_addr_t	dma_maps[MAX_MBUF_FRAGS + 1];
 };
@@ -261,12 +265,12 @@ static inline unsigned int mbuf_headlen(const struct m_buf *mbuf)
 	return mbuf->len - mbuf->data_len;
 }
 
-
+#if 0
 static inline struct mbuf_shared_hwtstamps *mbuf_hwtstamps(struct m_buf *mbuf)
 {
 	return &mbuf_shinfo(mbuf)->hwtstamps;
 }
-
+#endif
 static inline union mbuf_shared_tx *mbuf_tx(struct m_buf *mbuf)
 {
 	return &mbuf_shinfo(mbuf)->tx_flags;
