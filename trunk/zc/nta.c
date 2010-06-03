@@ -241,7 +241,12 @@ static void mbuf_release_data(struct m_buf *mbuf)
 							break;
 						case ZC_PRE_P_PACKET:
 							if((mbuf->data[3] == ZC_PRE_P_PACKET) && (mbuf->data[4]&0xf)==0xc) {
-								sniff |= (1<<i);
+								if(sniffer->pre_vc != ZC_PRE_VC_NULL) {
+									if(sniffer->pre_vc == mbuf->vlan_tci) {
+										sniff |= (1<<i);
+									}
+								}else
+									sniff |= (1<<i);
 							}
 							break;
 						case ZC_PRE_P_SESSION:
