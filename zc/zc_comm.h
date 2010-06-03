@@ -79,12 +79,13 @@ struct zc_sniff
 	u_int16_t	pre_p;		
 #define ZC_PRE_P_NPCP		0x8050
 #define ZC_PRE_P_NORMAL		0
-	u_int16_t	pre_type;
+	u_int8_t	pre_type;
 #define ZC_PRE_P_ALL		0
 #define ZC_PRE_P_CONRTOL	0x20
 #define ZC_PRE_P_PACKET		0x10
 #define ZC_PRE_P_SESSION	0x11
-
+	u_int8_t	pre_vc;
+#define ZC_PRE_VC_NULL		-1
 	u_int32_t acl_index;
 	
 };
