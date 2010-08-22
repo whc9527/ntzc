@@ -1,5 +1,5 @@
 本文简单介绍下ntzc的编译安装过程以及使用。
-一  编译安装
+
 1. 准备工作
 首先检查开发机上是否有linux kernel的代码，如果没有的话首先下载。然后编译trunk/zc中的代码，结果会生成一个ntzc.ko模块和一些网卡驱动的内核模块，接着编译trunk/nta中的代码，生成send和sniff测试文件。
 查看测试机的网卡，如果在虚拟机中，可能是pcnet32，如果是网络设备，可能是e1000或者e1000e。我们以pcnet32为例，将测试机使用的网卡所对应的驱动模块重命名，例如pcnet32.ko -> zwzpcnet32.ko。将开发机上的ntzc.ko，pcnet.ko，send以及sniff传入测试机中。
